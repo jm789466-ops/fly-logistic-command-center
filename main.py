@@ -13,7 +13,7 @@ from decimal import Decimal, InvalidOperation
 from email.message import EmailMessage
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -37,7 +37,7 @@ ROLES_SISTEMA = ["Administrador", "Gerencia", "Jefe de area", "Supervisión", "A
 ROLES_SUPERIORES = ["Administrador", "Gerencia", "Jefe de area"]
 ROLES_ACCESO_USUARIOS = ["Administrador", "Gerencia", "Jefe de area", "Supervisión"]
 
-ESTADOS = ["En proceso", "Facturado", "Aduana", "En tránsito", "Entregado"]
+ESTADOS = ["En proceso", "Facturado", "Aduana", "En tránsito", "Entregado", "Cancelado"]
 ESTADOS_ADUANA = ["No aplica / Pendiente", "En revisión aduanera", "Pago de aranceles", "Liberado / Nacionalizado"]
 METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia"]
 UNIDADES_MEDIDA = ["UND", "EA", "GAL", "LT", "KIT", "LB", "ROLLO", "CAJA", "MT", "PC"]
@@ -48,6 +48,7 @@ PESOS_PROBABILIDAD = {
     "En tránsito": 75,
     "Facturado": 90,
     "Entregado": 100,
+    "Cancelado": 0,
 }
 
 
@@ -134,48 +135,58 @@ def subir_a_drive(service, ruta_local, nombre_archivo, tipo, asesor):
                                   media_body=media, fields="id, webViewLink").execute()
 
 
-ENC_BASE = [
+# ==============================================================================
+# ESTRUCTURA SEPARADA NACIONAL (21 CAMPOS) E INTERNACIONAL (24 CAMPOS)
+# ==============================================================================
+ENC_NACIONAL = [
     "1. Fecha inicial",
-    "2. PO",
+    "2. PO (Orden de compra)",
     "3. Cliente",
     "4. Nombre del asesor",
     "5. Fecha de compra a proveedores",
-    "6. Proveedor (Origen)",
-    "7. Parte número por producto (SKU)",
-    "8. Parte número alterno",
-    "9. Descripción del producto",
+    "6. Proveedor",
+    "7. Parte número por producto",
+    "8. Descripción",
+    "9. Cantidad",
     "10. Unidad de medida",
-    "11. Cantidad",
-    "12. Método de pago",
-    "13. Precio unitario inicial ($)",
-    "14. Precio total ($)",
-    "15. IVA / TAX (%)",
-    "16. Valor después de IVA / TAX ($)",
-    "17. Plazo de entrega prometido",
+    "11. Método de pago",
+    "12. Precio unitario inicial ($)",
+    "13. Precio total ($)",
+    "14. IVA (19%) ($)",
+    "15. Valor después del IVA ($)",
+    "16. Plazo de entrega",
+    "17. Fecha de entrega al cliente",
+    "18. Número de remisión",
+    "19. Documentación",
+    "20. Estado",
+    "21. Observaciones",
 ]
 
-ENC_NACIONAL = ENC_BASE + [
-    "18. Días Hábiles (Semáforo)",
-    "19. Fecha de entrega al cliente",
-    "20. Número de remisión",
-    "21. Documentación",
-    "22. Estado",
-    "23. Observaciones",
-]
-
-ENC_INTERNACIONAL = ENC_BASE + [
-    "18. ¿Llega a Click Mail?",
-    "19. Fecha llegada Click Mail",
-    "20. Tracking",
-    "21. Nacionalización (Estado)",
-    "22. Fecha de Nacionalización",
-    "23. Valor de Nacionalización ($)",
-    "24. Días Hábiles (Semáforo)",
-    "25. Fecha de entrega al cliente",
-    "26. Número de remisión",
-    "27. Documentación",
-    "28. Estado",
-    "29. Observaciones",
+ENC_INTERNACIONAL = [
+    "1. Fecha inicial",
+    "2. PO (Orden de compra)",
+    "3. Cliente",
+    "4. Nombre del asesor",
+    "5. Fecha de compra a proveedores",
+    "6. Proveedor",
+    "7. Parte número por producto",
+    "8. Descripción",
+    "9. Cantidad",
+    "10. Unidad de medida",
+    "11. Método de pago",
+    "12. Precio unitario inicial ($)",
+    "13. Precio total ($)",
+    "14. IVA / TAX (7%) ($)",
+    "15. Valor después del IVA ($)",
+    "16. Plazo de entrega",
+    "17. Fecha de entrega warehouse EEUU",
+    "18. Tracking",
+    "19. Nacionalización (Estado)",
+    "20. Valor de la nacionalización ($)",
+    "21. Fecha de Nacionalización",
+    "22. Documentación",
+    "23. Estado",
+    "24. Observaciones",
 ]
 
 
@@ -184,12 +195,13 @@ def generar_excel(ruta, p: models.Pedido, intl: models.PedidoInternacional | Non
     ws = wb.active
     ws.title = "FLY2026"
 
-    if p.tipo == "Nacional":
-        ws.merge_cells("A1:W1")
-        titulo, encabezados = "CUADRO DE COMPRAS NACIONALES FLY LOGISTIC 2026", ENC_NACIONAL
+    es_nacional = (p.tipo == "Nacional")
+    if es_nacional:
+        ws.merge_cells("A1:U1")  # 21 columnas (A -> U)
+        titulo, encabezados = "ADMINISTRADOR DE PEDIDOS NACIONAL · FLY LOGISTIC 2026", ENC_NACIONAL
     else:
-        ws.merge_cells("A1:AC1")
-        titulo, encabezados = "CUADRO DE COMPRAS EN EL EXTERIOR FLY LOGISTIC 2026", ENC_INTERNACIONAL
+        ws.merge_cells("A1:X1")  # 24 columnas (A -> X)
+        titulo, encabezados = "ADMINISTRADOR DE PEDIDOS INTERNACIONAL · FLY LOGISTIC 2026", ENC_INTERNACIONAL
 
     t = ws["A1"]
     t.value = titulo
@@ -206,76 +218,93 @@ def generar_excel(ruta, p: models.Pedido, intl: models.PedidoInternacional | Non
         c.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 30
 
-    semaforo = p.dias_habiles_info["detalle"]
-    val_nac = float(p.valor_nacionalizacion or 0)
+    val_nac_total = float(p.valor_nacionalizacion or 0)
+    num_items = max(len(p.items), 1)
+    val_nac_por_item = round(val_nac_total / num_items, 2) if not es_nacional else 0.0
 
     for idx, item in enumerate(p.items, start=3):
-        iva_item = float(item.iva_porcentaje if item.iva_porcentaje is not None else p.iva_porcentaje)
-        medio = []
-        if p.tipo == "Internacional":
-            llega_cm = (intl.llega_click_mail if intl and intl.llega_click_mail else ("Si" if (intl and intl.fecha_click_mail) else "No"))
-            fecha_cm = intl.fecha_click_mail if (intl and llega_cm == "Si") else None
-            medio = [
-                llega_cm,
-                fecha_cm,
-                intl.tracking if intl else "",
-                intl.estado_nacionalizacion if intl else "",
-                intl.fecha_nacionalizacion if intl else None,
-                val_nac if idx == 3 else 0.0,
-            ]
-        cola = [
-            semaforo,
-            p.fecha_entrega_cliente,
-            p.numero_remision,
-            p.documentacion,
-            p.estado,
-            p.observaciones,
+        iva_pct = float(item.iva_porcentaje if item.iva_porcentaje is not None else (19 if es_nacional else 7))
+        sku_completo = item.parte_numero
+        if item.parte_numero_alterno:
+            sku_completo = f"{sku_completo} (Alt: {item.parte_numero_alterno})"
+
+        # Columnas 1 a 16 (A a P) son comunes en orden numérico
+        # I (9) = Cantidad | L (12) = Precio unitario | M (13) = Precio total | N (14) = IVA ($) | O (15) = Valor después de IVA
+        base_fila = [
+            p.fecha_inicial,                          # A (1): Fecha inicial
+            p.po,                                     # B (2): PO
+            p.cliente.nombre if p.cliente else "",    # C (3): Cliente
+            p.asesor.nombre if p.asesor else "",      # D (4): Nombre del asesor
+            item.fecha_compra_proveedor,              # E (5): Fecha de compra a proveedores
+            item.proveedor,                           # F (6): Proveedor
+            sku_completo,                             # G (7): Parte número por producto
+            item.descripcion,                         # H (8): Descripción
+            int(item.cantidad),                       # I (9): Cantidad
+            item.unidad_medida or "UND",              # J (10): Unidad de medida
+            p.metodo_pago or "",                      # K (11): Método de pago
+            float(item.precio_unitario),              # L (12): Precio unitario inicial
+            f"=I{idx}*L{idx}",                        # M (13): Precio total (Cantidad x Precio unitario)
+            f"=M{idx}*({iva_pct}/100)",               # N (14): IVA (19% o 7%) en valor ($)
         ]
-        fila = [
-            p.fecha_inicial,
-            p.po,
-            p.cliente.nombre if p.cliente else "",
-            p.asesor.nombre if p.asesor else "",
-            item.fecha_compra_proveedor,
-            item.proveedor,
-            item.parte_numero,
-            item.parte_numero_alterno or "",
-            item.descripcion,
-            item.unidad_medida or "UND",
-            int(item.cantidad),
-            p.metodo_pago or "",
-            float(item.precio_unitario),
-            f"=K{idx}*M{idx}",
-            iva_item,
-            f"=N{idx}*(1+O{idx}/100)",
-            p.plazo_entrega,
-        ] + medio + cola
-        ws.append(fila)
+
+        if es_nacional:
+            # En Nacional: Valor después del IVA = Precio total + IVA
+            valor_despues_iva = f"=M{idx}+N{idx}"
+            cola_nacional = [
+                valor_despues_iva,                    # O (15): Valor después del IVA
+                p.plazo_entrega,                      # P (16): Plazo de entrega
+                p.fecha_entrega_cliente,              # Q (17): Fecha de entrega al cliente
+                p.numero_remision or "",              # R (18): Número de remisión
+                p.documentacion or "",                # S (19): Documentación
+                p.estado,                             # T (20): Estado
+                p.observaciones or "",                # U (21): Observaciones
+            ]
+            ws.append(base_fila + cola_nacional)
+        else:
+            # En Internacional: Valor después del IVA incluye el costo operativo de nacionalización (Columna T)
+            valor_despues_iva = f"=M{idx}+N{idx}+T{idx}"
+            fecha_warehouse = intl.fecha_click_mail if intl else None
+            tracking = (intl.tracking or "") if intl else ""
+            est_nac = (intl.estado_nacionalizacion or "No aplica / Pendiente") if intl else "No aplica / Pendiente"
+            fecha_nac = intl.fecha_nacionalizacion if intl else None
+
+            cola_internacional = [
+                valor_despues_iva,                    # O (15): Valor después del IVA (+ Nacionalización)
+                p.plazo_entrega,                      # P (16): Plazo de entrega
+                fecha_warehouse,                      # Q (17): Fecha de entrega warehouse EEUU
+                tracking,                             # R (18): Tracking
+                est_nac,                              # S (19): Nacionalización (Estado)
+                val_nac_por_item,                     # T (20): Valor de la nacionalización ($)
+                fecha_nac,                            # U (21): Fecha de Nacionalización
+                p.documentacion or "",                # V (22): Documentación
+                p.estado,                             # W (23): Estado
+                p.observaciones or "",                # X (24): Observaciones
+            ]
+            ws.append(base_fila + cola_internacional)
 
     ultima_fila_items = 2 + len(p.items)
     fila_tot = ultima_fila_items + 1
-    ws[f"L{fila_tot}"] = "TOTALES PO:"
-    ws[f"L{fila_tot}"].font = Font(bold=True, color="002060")
-    ws[f"N{fila_tot}"] = f"=SUM(N3:N{ultima_fila_items})"
-    ws[f"N{fila_tot}"].font = Font(bold=True)
-    ws[f"N{fila_tot}"].number_format = '"$"#,##0.00'
-    ws[f"P{fila_tot}"] = f"=SUM(P3:P{ultima_fila_items})"
-    ws[f"P{fila_tot}"].font = Font(bold=True, color="002060")
-    ws[f"P{fila_tot}"].number_format = '"$"#,##0.00'
+    ws[f"K{fila_tot}"] = "TOTALES PO:"
+    ws[f"K{fila_tot}"].font = Font(bold=True, color="002060")
 
-    if p.tipo == "Internacional":
-        ws[f"W{fila_tot}"] = f"=SUM(W3:W{ultima_fila_items})"
-        ws[f"W{fila_tot}"].font = Font(bold=True, color="002060")
-        ws[f"W{fila_tot}"].number_format = '"$"#,##0.00'
+    for col_letra in ("M", "N", "O"):
+        ws[f"{col_letra}{fila_tot}"] = f"=SUM({col_letra}3:{col_letra}{ultima_fila_items})"
+        ws[f"{col_letra}{fila_tot}"].font = Font(bold=True, color="002060")
+        ws[f"{col_letra}{fila_tot}"].number_format = '"$"#,##0.00'
+
+    if not es_nacional:
+        ws[f"T{fila_tot}"] = f"=SUM(T3:T{ultima_fila_items})"
+        ws[f"T{fila_tot}"].font = Font(bold=True, color="002060")
+        ws[f"T{fila_tot}"].number_format = '"$"#,##0.00'
 
     for i, enc in enumerate(encabezados, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = max(16, len(enc) * 0.92)
+        ws.column_dimensions[get_column_letter(i)].width = max(16, len(enc) * 0.95)
 
     for row in range(3, 3 + len(p.items)):
-        for celda in (f"M{row}", f"N{row}", f"P{row}"):
+        for celda in (f"L{row}", f"M{row}", f"N{row}", f"O{row}"):
             ws[celda].number_format = '"$"#,##0.00'
-        if p.tipo == "Internacional":
-            ws[f"W{row}"].number_format = '"$"#,##0.00'
+        if not es_nacional:
+            ws[f"T{row}"].number_format = '"$"#,##0.00'
         for c in ws[row]:
             if hasattr(c.value, "year"):
                 c.number_format = "YYYY-MM-DD"
@@ -567,8 +596,6 @@ def guardar_config_correo(host: str, port: int, user_smtp: str, password_smtp: s
 
 
 def enviar_correo_con_diagnostico(destino: str, asunto: str, cuerpo: str) -> tuple[bool, str]:
-    """Intenta enviar correo negociando automáticamente SSL (465) y STARTTLS (587)
-    en el servidor configurado y servidores alternativos del dominio para evitar desconexiones."""
     cfg = config_correo()
     remitente = cfg.get("user") or CORREO_OFICIAL
     clave = cfg.get("password") or CLAVE_CORREO_PRUEBA
@@ -659,7 +686,7 @@ def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
         est_nac = i.estado_nacionalizacion if (i and i.estado_nacionalizacion) else "Pendiente"
         intl_txt = (
             f"\n--- DATOS INTERNACIONALES Y NACIONALIZACIÓN ---\n"
-            f"• ¿Llega a Click Mail?: {llega_cm} (Fecha: {fecha_cm})\n"
+            f"• ¿Llega a Warehouse EEUU / Click Mail?: {llega_cm} (Fecha: {fecha_cm})\n"
             f"• Tracking: {(i.tracking if i and i.tracking else 'Sin asignar')}\n"
             f"• Estado de Nacionalización: {est_nac}\n"
             f"• Fecha de Nacionalización: {fecha_nac}\n"
@@ -830,8 +857,19 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
             "iva_porcentaje": iva_it,
         })
 
-    llega_cm = "Si" if d.get("llega_click_mail") == "Si" else "No"
-    fecha_cm = _fecha(d.get("fecha_click_mail"), "Fecha Click Mail") if llega_cm == "Si" else None
+    # En Internacional guardamos siempre fecha_click_mail (Fecha de entrega warehouse EEUU)
+    if tipo == "Internacional":
+        fecha_cm = _fecha(d.get("fecha_click_mail"), "Fecha Warehouse EEUU / Click Mail")
+        llega_cm = "Si" if (d.get("llega_click_mail") == "Si" or fecha_cm is not None) else "No"
+        intl_data = {
+            "llega_click_mail": llega_cm,
+            "fecha_click_mail": fecha_cm,
+            "tracking": d.get("tracking") or "",
+            "estado_nacionalizacion": d.get("estado_nacionalizacion") or "No aplica / Pendiente",
+            "fecha_nacionalizacion": _fecha(d.get("fecha_nacionaliza"), "Fecha de Nacionalización"),
+        }
+    else:
+        intl_data = None
 
     return {
         "po": d["po_numero"],
@@ -848,13 +886,7 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
         "estado": d["estado_general"],
         "observaciones": d.get("observaciones"),
         "items": items,
-        "intl": {
-            "llega_click_mail": llega_cm,
-            "fecha_click_mail": fecha_cm,
-            "tracking": d.get("tracking"),
-            "estado_nacionalizacion": d.get("estado_nacionalizacion"),
-            "fecha_nacionalizacion": _fecha(d.get("fecha_nacionaliza"), "Fecha de Nacionalización"),
-        } if tipo == "Internacional" else None,
+        "intl": intl_data,
     }
 
 
@@ -895,13 +927,25 @@ def pedido_del_usuario(db: Session, pid: int, user: models.Asesor) -> models.Ped
     return q.first()
 
 
-@app.get("/")
+# ==============================================================================
+# RUTAS CON SOPORTE GET Y HEAD PARA UPTIMEROBOT (SOLUCIÓN AL ERROR 405)
+# ==============================================================================
+@app.api_route("/healthz", methods=["GET", "HEAD"])
+def health_check():
+    return JSONResponse({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def inicio(request: Request):
+    if request.method == "HEAD":
+        return HTMLResponse(content="", status_code=200)
     return RedirectResponse("/pedidos" if request.session.get("asesor_id") else "/login", status_code=303)
 
 
-@app.get("/login", response_class=HTMLResponse)
+@app.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def login_form(request: Request):
+    if request.method == "HEAD":
+        return HTMLResponse(content="", status_code=200)
     if request.session.get("asesor_id"):
         return RedirectResponse("/pedidos", status_code=303)
     return render(request, "login.html", {"username": "", "error": None})
@@ -923,7 +967,7 @@ async def login_post(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/pedidos", status_code=303)
 
 
-@app.post("/logout")
+@app.api_route("/logout", methods=["GET", "POST"])
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
