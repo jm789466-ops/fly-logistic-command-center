@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+    <div>
+        <h2 class="text-2xl font-extrabold fly-text">Centro de Mando · Órdenes de Compra (PO)</h2>
+        <p class="text-sm text-slate-500">Monitoreo ejecutivo de días hábiles a favor (verde) y en contra (rojo)</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <form action="/pedidos/notificar_proximos" method="post" class="m-0">
+            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow transition uppercase tracking-wider">
+                ✉ Despachar Seguimiento Diario por Correo
+            </button>
+        </form>
+        <a href="/pedidos/nuevo" class="fly-bg fly-hover text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow transition">
+            + Registrar Nueva PO
+        </a>
+    </div>
+</div>
+
+{% if pedidos %}
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+    <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Semáforo Ejecutivo de Tiempos de Entrega (Días Hábiles)</h3>
+    <div class="flex flex-wrap gap-2">
+        {% for p in pedidos %}
+            {% set info = p.dias_habiles_info %}
+            <a href="/pedidos/{{ p.id }}/editar" class="whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold shadow-sm transition inline-flex items-center
+                {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
+                {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
+                {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
+                {{ info.etiqueta }}
+            </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
+    <form method="get" action="/pedidos" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por número de PO o Cliente..." class="px-4 py-2 border rounded-lg text-sm">
+        <select name="tipo" class="px-3 py-2 border rounded-lg text-sm bg-white">
+            <option value="">Todos los Tipos</option>
+            <option value="Nacional" {% if tipo_f == 'Nacional' %}selected{% endif %}>Operación Nacional</option>
+            <option value="Internacional" {% if tipo_f == 'Internacional' %}selected{% endif %}>Operación Internacional</option>
+        </select>
+        <select name="estado" class="px-3 py-2 border rounded-lg text-sm bg-white">
+            <option value="">Todos los Estados</option>
+            {% for e in estados %}
+            <option value="{{ e }}" {% if estado_f == e %}selected{% endif %}>{{ e }}</option>
+            {% endfor %}
+        </select>
+        <div class="flex gap-2">
+            <button type="submit" class="fly-bg text-white px-5 py-2 rounded-lg text-sm font-bold flex-grow">Filtrar</button>
+            <a href="/pedidos" class="bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-semibold">Todos</a>
+        </div>
+    </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="fly-bg text-white text-xs uppercase">
+            <tr>
+                <th class="px-4 py-3.5 text-left whitespace-nowrap">PO / Semáforo Días Hábiles</th>
+                <th class="px-4 py-3.5 text-left whitespace-nowrap">Cliente</th>
+                <th class="px-4 py-3.5 text-left whitespace-nowrap">Operación / Pago</th>
+                <th class="px-4 py-3.5 text-left whitespace-nowrap">Responsable</th>
+                <th class="px-4 py-3.5 text-left whitespace-nowrap">Fechas Clave</th>
+                <th class="px-4 py-3.5 text-right whitespace-nowrap">Nacionalización</th>
+                <th class="px-4 py-3.5 text-right whitespace-nowrap">Total Final</th>
+                <th class="px-4 py-3.5 text-right whitespace-nowrap">Acciones</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            {% for p in pedidos %}
+            {% set info = p.dias_habiles_info %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <div class="flex items-center gap-2.5">
+                        <span class="font-extrabold text-[#002060] text-base">PO {{ p.po }}</span>
+                        <span class="whitespace-nowrap inline-block px-3 py-1 rounded-md text-xs font-extrabold shadow-sm
+                            {% if info.color == 'emerald' %}bg-emerald-600 text-white
+                            {% elif info.color == 'red' %}bg-red-600 text-white
+                            {% else %}bg-slate-200 text-slate-700{% endif %}">
+                            {{ info.etiqueta }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">Inicio: {{ p.fecha_inicial }} &middot; Estado: <strong class="text-slate-700">{{ p.estado }}</strong></div>
+                </td>
+                <td class="px-4 py-3.5 font-bold text-slate-800 whitespace-nowrap">{{ p.cliente.nombre }}</td>
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <span class="px-2.5 py-0.5 text-xs font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
+                        {{ p.tipo }}
+                    </span>
+                    <div class="text-xs text-slate-500 mt-1">{{ p.metodo_pago or 'Por definir' }}</div>
+                </td>
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <div class="font-bold text-slate-800">{{ p.asesor.nombre }}</div>
+                    <div class="text-xs text-slate-500">{{ p.asesor.email or 'support1@eagleaeronauticalsupport.com' }}</div>
+                </td>
+                <td class="px-4 py-3.5 text-xs whitespace-nowrap">
+                    <div><span class="text-slate-400 font-semibold">Plazo:</span> <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
+                    {% if p.fecha_entrega_cliente %}
+                    <div class="text-emerald-700 font-bold mt-0.5">Entrega: {{ p.fecha_entrega_cliente }}</div>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3.5 text-right font-bold text-amber-700 whitespace-nowrap">
+                    {{ p.valor_nacionalizacion_dec | money }}
+                </td>
+                <td class="px-4 py-3.5 text-right font-extrabold text-slate-900 whitespace-nowrap">
+                    {{ p.total | money }}
+                </td>
+                <td class="px-4 py-3.5 text-right whitespace-nowrap space-x-1">
+                    <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
+                        <button type="submit" class="bg-amber-100 text-amber-800 hover:bg-amber-200 px-2.5 py-1.5 rounded-lg font-bold text-xs">✉ Correo</button>
+                    </form>
+                    <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Editar</a>
+                    <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Excel</a>
+                    {% if p.drive_link %}
+                    <a href="{{ p.drive_link }}" target="_blank" class="bg-sky-50 text-sky-700 hover:bg-sky-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Drive</a>
+                    {% endif %}
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                    <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Eliminar la PO {{ p.po }}?');" class="inline m-0">
+                        <button type="submit" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">✕</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="px-6 py-12 text-center text-slate-400">No hay órdenes de compra registradas con este filtro.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

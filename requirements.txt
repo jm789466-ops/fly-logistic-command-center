@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+jinja2
+python-multipart
+itsdangerous
+openpyxl
+google-api-python-client
+google-auth-oauthlib

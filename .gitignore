@@ -1,0 +1,7 @@
+token.json
+client_secrets.json
+client_secrets.json.json
+.secret_key
+pedidos.db
+venv/
+__pycache__/

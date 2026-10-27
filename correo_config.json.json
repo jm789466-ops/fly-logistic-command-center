@@ -1,0 +1,8 @@
+{
+  "host": "mail.eagleaeronauticalsupport.com",
+  "port": 465,
+  "user": "support1@eagleaeronauticalsupport.com",
+  "password": "Colombia2024*",
+  "from": "Fly Logistic Command Center <support1@eagleaeronauticalsupport.com>",
+  "app_url": "http://127.0.0.1:8000"
+}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+    <div>
+        <h2 class="text-2xl font-extrabold fly-text">Centro de Inteligencia y Medición Operativa</h2>
+        <p class="text-sm text-slate-500">Análisis de Probabilidad de Cierre, Compras Pendientes, Tiempos de Gestión y Habilidades del Equipo</p>
+    </div>
+    <a href="/informes/excel?asesor_id={{ f_asesor }}&tipo={{ f_tipo }}&desde={{ f_desde }}&hasta={{ f_hasta }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow flex items-center gap-2 transition">
+        <span>⬇ Descargar Reporte Gerencial Excel</span>
+    </a>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+    <form method="get" action="/informes" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+        <div>
+            <label class="text-xs font-bold uppercase text-slate-500">Filtrar por Asesor</label>
+            <select name="asesor_id" class="w-full border px-3 py-2 rounded-lg text-sm bg-white">
+                <option value="">Todos los Integrantes</option>
+                {% for a in asesores_equipo %}
+                <option value="{{ a.id }}" {% if f_asesor == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="text-xs font-bold uppercase text-slate-500">Tipo de Operación</label>
+            <select name="tipo" class="w-full border px-3 py-2 rounded-lg text-sm bg-white">
+                <option value="">Nacional + Internacional</option>
+                <option value="Nacional" {% if f_tipo == 'Nacional' %}selected{% endif %}>Nacional</option>
+                <option value="Internacional" {% if f_tipo == 'Internacional' %}selected{% endif %}>Internacional</option>
+            </select>
+        </div>
+        <div>
+            <label class="text-xs font-bold uppercase text-slate-500">Desde Fecha</label>
+            <input type="date" name="desde" value="{{ f_desde }}" class="w-full border px-3 py-2 rounded-lg text-sm">
+        </div>
+        <div>
+            <label class="text-xs font-bold uppercase text-slate-500">Hasta Fecha</label>
+            <input type="date" name="hasta" value="{{ f_hasta }}" class="w-full border px-3 py-2 rounded-lg text-sm">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="fly-bg fly-hover text-white px-4 py-2 rounded-lg text-sm font-bold flex-grow">Filtrar</button>
+            <a href="/informes" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm font-semibold">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-[#002060]">
+        <span class="text-xs font-bold uppercase text-slate-400">Total Casos (POs)</span>
+        <p class="text-2xl font-extrabold text-slate-800 mt-1">{{ total_pedidos }}</p>
+        <p class="text-xs text-blue-700 mt-1">{{ total_nacionales }} Nac. / {{ total_internacionales }} Intl.</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500">
+        <span class="text-xs font-bold uppercase text-slate-400">Volumen Gestionado</span>
+        <p class="text-2xl font-extrabold text-slate-800 mt-1">{{ valor_total_ventas | money }}</p>
+        <p class="text-xs text-emerald-600 mt-1">Nacionalización: {{ valor_total_nacionalizacion | money }}</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-sky-500">
+        <span class="text-xs font-bold uppercase text-slate-400">Probabilidad de Éxito</span>
+        <p class="text-2xl font-extrabold text-slate-800 mt-1">{{ probabilidad_global }}%</p>
+        <p class="text-xs text-sky-600 mt-1">Ponderación por etapa</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500">
+        <span class="text-xs font-bold uppercase text-slate-400">Compras Pendientes</span>
+        <p class="text-2xl font-extrabold text-slate-800 mt-1">{{ pendientes_gestion }} POs</p>
+        <p class="text-xs text-amber-600 mt-1">{{ items_sin_compra }} ítems sin fecha compra</p>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-purple-600">
+        <span class="text-xs font-bold uppercase text-slate-400">Tiempo de Gestión</span>
+        <p class="text-2xl font-extrabold text-slate-800 mt-1">{{ tiempo_promedio_dias }} días</p>
+        <p class="text-xs text-purple-600 mt-1">Cumplimiento SLA: {{ cumplimiento_sla }}%</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-bold uppercase tracking-wider fly-text mb-4">Evolución Mensual: Nacional vs Internacional</h3>
+        <canvas id="chartMensual" height="180"></canvas>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-bold uppercase tracking-wider fly-text mb-4">Volumen Gestionado por Responsable</h3>
+        <canvas id="chartAsesores" height="180"></canvas>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-bold uppercase tracking-wider fly-text mb-4">Distribución de Casos por Estado Operativo</h3>
+        <div class="max-w-xs mx-auto">
+            <canvas id="chartEstados"></canvas>
+        </div>
+    </div>
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-bold uppercase tracking-wider fly-text mb-4">Top Proveedores por Volumen de Compra</h3>
+        <canvas id="chartProveedores" height="180"></canvas>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+    <div class="fly-bg text-white px-6 py-3.5 flex justify-between items-center">
+        <h3 class="font-bold text-sm uppercase tracking-wider">Matriz de Habilidades, Tiempos de Gestión y Efectividad por Responsable</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-100 text-xs uppercase text-slate-600">
+                <tr>
+                    <th class="px-4 py-3 text-left">Responsable</th>
+                    <th class="px-4 py-3 text-left">Jefe Directo</th>
+                    <th class="px-4 py-3 text-center">Casos Totales</th>
+                    <th class="px-4 py-3 text-center">Entregados</th>
+                    <th class="px-4 py-3 text-center">POs Pendientes</th>
+                    <th class="px-4 py-3 text-center">Ítems Sin Comprar</th>
+                    <th class="px-4 py-3 text-center">Tiempo Promedio</th>
+                    <th class="px-4 py-3 text-center">Prob. Cierre</th>
+                    <th class="px-4 py-3 text-center">Desempeño</th>
+                    <th class="px-4 py-3 text-right">Monto Gestionado</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                {% for a in tabla_asesores %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-bold text-slate-900">{{ a.nombre }} <span class="text-xs font-normal text-slate-500">({{ a.rol }})</span></td>
+                    <td class="px-4 py-3 text-slate-600">{{ a.jefe }}</td>
+                    <td class="px-4 py-3 text-center font-bold">{{ a.total_pos }}</td>
+                    <td class="px-4 py-3 text-center text-emerald-600 font-bold">{{ a.entregados }}</td>
+                    <td class="px-4 py-3 text-center text-amber-600 font-bold">{{ a.pendientes }}</td>
+                    <td class="px-4 py-3 text-center text-red-600 font-semibold">{{ a.items_pendientes_compra }}</td>
+                    <td class="px-4 py-3 text-center">{{ a.tiempo_promedio }} días</td>
+                    <td class="px-4 py-3 text-center font-bold text-blue-700">{{ a.probabilidad }}%</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold {% if a.nivel == 'Sobresaliente' %}bg-emerald-100 text-emerald-800{% elif a.nivel == 'Óptimo' %}bg-blue-100 text-blue-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                            {{ a.nivel }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-bold">{{ a.volumen | money }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="bg-slate-800 text-white px-6 py-3.5">
+        <h3 class="font-bold text-sm uppercase tracking-wider">Detalle de Compras Pendientes, Nacionalización y Semáforo de Días Hábiles</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-600">
+                <tr>
+                    <th class="px-4 py-3 text-left">PO</th>
+                    <th class="px-4 py-3 text-left">Cliente</th>
+                    <th class="px-4 py-3 text-left">Responsable</th>
+                    <th class="px-4 py-3 text-center">Estado</th>
+                    <th class="px-4 py-3 text-center">Semáforo Días Hábiles</th>
+                    <th class="px-4 py-3 text-center">Ítems sin Compra</th>
+                    <th class="px-4 py-3 text-right">Nacionalización</th>
+                    <th class="px-4 py-3 text-right">Valor Total</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                {% for cp in compras_pendientes_po %}
+                {% set info = cp.dias_habiles_info %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-bold"><a href="/pedidos/{{ cp.id }}/editar" class="text-blue-700 hover:underline">{{ cp.po }}</a></td>
+                    <td class="px-4 py-3">{{ cp.cliente }}</td>
+                    <td class="px-4 py-3">{{ cp.asesor }}</td>
+                    <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded bg-blue-50 text-blue-800 text-xs font-semibold">{{ cp.estado }}</span></td>
+                    <td class="px-4 py-3 text-center whitespace-nowrap">
+                        <span class="px-3 py-1 rounded-md text-xs font-extrabold {% if info.color == 'emerald' %}bg-emerald-600 text-white{% elif info.color == 'red' %}bg-red-600 text-white{% else %}bg-slate-200 text-slate-700{% endif %}">
+                            {{ info.etiqueta }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center font-bold {% if cp.items_pendientes > 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
+                        {{ cp.items_pendientes }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ cp.valor_nacionalizacion | money }}</td>
+                    <td class="px-4 py-3 text-right font-semibold">{{ cp.total | money }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay órdenes con compras o entregas pendientes.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const mesesLabels = JSON.parse('{{ meses_labels | safe }}');
+    const mesesNacData = JSON.parse('{{ meses_nac_data | safe }}');
+    const mesesIntData = JSON.parse('{{ meses_int_data | safe }}');
+    const estadosLabels = JSON.parse('{{ estados_labels | safe }}');
+    const estadosData = JSON.parse('{{ estados_data | safe }}');
+    const asesoresLabels = JSON.parse('{{ asesores_labels | safe }}');
+    const asesoresVolData = JSON.parse('{{ asesores_vol_data | safe }}');
+    const provLabels = JSON.parse('{{ prov_labels | safe }}');
+    const provData = JSON.parse('{{ prov_data | safe }}');
+
+    new Chart(document.getElementById('chartMensual'), {
+        type: 'bar',
+        data: {
+            labels: mesesLabels,
+            datasets: [
+                { label: 'Nacional ($)', data: mesesNacData, backgroundColor: '#002060', borderRadius: 4 },
+                { label: 'Internacional ($)', data: mesesIntData, backgroundColor: '#0ea5e9', borderRadius: 4 }
+            ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+
+    new Chart(document.getElementById('chartAsesores'), {
+        type: 'bar',
+        data: {
+            labels: asesoresLabels,
+            datasets: [{ label: 'Volumen Gestionado ($)', data: asesoresVolData, backgroundColor: '#1e40af', borderRadius: 4 }]
+        },
+        options: { indexAxis: 'y', responsive: true }
+    });
+
+    new Chart(document.getElementById('chartEstados'), {
+        type: 'doughnut',
+        data: {
+            labels: estadosLabels,
+            datasets: [{
+                data: estadosData,
+                backgroundColor: ['#f59e0b', '#3b82f6', '#8b5cf6', '#0ea5e9', '#10b981']
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('chartProveedores'), {
+        type: 'bar',
+        data: {
+            labels: provLabels,
+            datasets: [{ label: 'Compras a Proveedor ($)', data: provData, backgroundColor: '#0f172a', borderRadius: 4 }]
+        },
+        options: { responsive: true }
+    });
+</script>
+{% endblock %}

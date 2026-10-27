@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
+    <h2 class="text-xl font-extrabold fly-text uppercase text-center mb-6">Asignar Nueva Contraseña</h2>
+    {% if error %}
+    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+    {% if valido %}
+    <form method="post" class="space-y-4">
+        <div><label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nueva Contraseña</label><input type="password" name="password" required autofocus class="w-full px-4 py-2.5 border rounded-lg"></div>
+        <div><label class="block text-xs font-bold uppercase text-slate-600 mb-1">Confirmar Contraseña</label><input type="password" name="password2" required class="w-full px-4 py-2.5 border rounded-lg"></div>
+        <button type="submit" class="w-full py-3 rounded-lg text-white font-bold fly-bg fly-hover text-sm uppercase">Guardar Contraseña</button>
+    </form>
+    {% else %}
+    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 mb-4 text-sm text-center">El enlace es inválido o ha expirado.</div>
+    <div class="text-center"><a href="/olvide" class="text-blue-700 font-bold text-sm hover:underline">Solicitar un nuevo enlace</a></div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-8">
+    <div class="flex flex-wrap justify-between items-center mb-4">
+        <div>
+            <h2 class="text-2xl font-extrabold fly-text">Control de Perfiles, Supervisión y Accesos</h2>
+            <p class="text-sm text-slate-500">
+                {% if user.rol == 'Supervisión' %}
+                Modo Supervisión: Autorización exclusiva para reasignar contraseñas de usuarios.
+                {% else %}
+                Gestión jerárquica de Arquitecto Maestro, Gerencia, Jefes de Área, Supervisión y Asesores.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-[#002060]">
+        <h3 class="text-sm font-bold uppercase tracking-wider text-[#002060] mb-4">+ Registrar Nuevo Integrante</h3>
+        <form action="/gestion_usuarios/accion" method="post" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+            <input type="hidden" name="accion" value="crear">
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Nombre Completo</label>
+                <input type="text" name="nombre" required class="border px-3 py-2 rounded-lg w-full text-sm">
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Usuario (Login)</label>
+                <input type="text" name="username" required class="border px-3 py-2 rounded-lg w-full text-sm">
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Correo Electrónico</label>
+                <input type="email" name="email" value="support1@eagleaeronauticalsupport.com" required class="border px-3 py-2 rounded-lg w-full text-sm">
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Contraseña (mín. 8)</label>
+                <input type="password" name="password" value="Colombia2024*" required class="border px-3 py-2 rounded-lg w-full text-sm">
+            </div>
+            {% if user.rol in ['Administrador', 'Gerencia'] %}
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Perfil / Rol</label>
+                <select name="rol" class="border px-3 py-2 rounded-lg w-full text-sm bg-white font-semibold">
+                    {% for r in roles_sistema %}
+                    <option value="{{ r }}" {% if r == 'Asesor' %}selected{% endif %}>{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Jefe Directo</label>
+                <select name="jefe_id" class="border px-3 py-2 rounded-lg w-full text-sm bg-white">
+                    <option value="">-- Directo --</option>
+                    {% for j in jefes_disponibles %}
+                    <option value="{{ j.id }}">{{ j.nombre }} ({{ j.rol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="md:col-span-full flex justify-end mt-2">
+                <button type="submit" class="fly-bg fly-hover text-white px-6 py-2 rounded-lg font-bold text-sm shadow transition">
+                    Crear Cuenta
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="fly-bg text-white text-xs uppercase">
+            <tr>
+                <th class="px-4 py-3.5 text-left">Integrante / Login</th>
+                <th class="px-4 py-3.5 text-left">Rol y Jerarquía</th>
+                {% if user.rol != 'Supervisión' %}
+                <th class="px-4 py-3.5 text-left">Modificar Correo</th>
+                {% endif %}
+                <th class="px-4 py-3.5 text-left">Reasignar Contraseña</th>
+                {% if user.rol != 'Supervisión' %}
+                <th class="px-4 py-3.5 text-right">Estado / Eliminar</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            {% for u in usuarios %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <div class="font-extrabold text-slate-900">{{ u.nombre }}</div>
+                    <div class="text-xs text-slate-500">Usuario: <span class="font-mono font-bold text-blue-900">{{ u.username }}</span></div>
+                </td>
+
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    {% if u.username == 'admin' %}
+                    <span class="px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-950 text-sky-300 border border-sky-500 shadow-sm">
+                        ★ Arquitecto Maestro · Control Total
+                    </span>
+                    {% elif user.rol in ['Administrador', 'Gerencia'] %}
+                    <form action="/gestion_usuarios/accion" method="post" class="flex items-center gap-1.5 m-0">
+                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                        <input type="hidden" name="accion" value="modificar_rol_jefe">
+                        <select name="nuevo_rol" class="border px-2.5 py-1.5 rounded-lg text-xs bg-white font-semibold">
+                            {% for r in roles_sistema %}
+                            <option value="{{ r }}" {% if u.rol == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="nuevo_jefe_id" class="border px-2.5 py-1.5 rounded-lg text-xs bg-white">
+                            <option value="">Directo</option>
+                            {% for j in jefes_disponibles %}
+                            <option value="{{ j.id }}" {% if u.jefe_id == j.id %}selected{% endif %}>Jefe: {{ j.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Guardar</button>
+                    </form>
+                    {% else %}
+                    <span class="px-2.5 py-1 text-xs rounded-full bg-blue-100 text-blue-800 font-bold">{{ u.rol }}</span>
+                    <span class="text-xs text-slate-500 ml-2">Jefe: {{ u.jefe.nombre if u.jefe else 'Directo' }}</span>
+                    {% endif %}
+                </td>
+
+                {% if user.rol != 'Supervisión' %}
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <form action="/gestion_usuarios/accion" method="post" class="flex gap-1.5 items-center m-0">
+                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                        <input type="hidden" name="accion" value="modificar_correo">
+                        <input type="email" name="nuevo_correo" value="{{ u.email or 'support1@eagleaeronauticalsupport.com' }}" required class="border px-2.5 py-1.5 rounded-lg text-xs w-52">
+                        <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Correo</button>
+                    </form>
+                </td>
+                {% endif %}
+
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                    <form action="/gestion_usuarios/accion" method="post" class="flex gap-1.5 items-center m-0">
+                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                        <input type="hidden" name="accion" value="modificar_clave">
+                        <input type="password" name="nueva_clave" placeholder="Nueva clave (mín 8)" required class="border px-2.5 py-1.5 rounded-lg text-xs w-36">
+                        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Cambiar Clave</button>
+                    </form>
+                </td>
+
+                {% if user.rol != 'Supervisión' %}
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                    {% if u.id != user.id and u.username != 'admin' %}
+                    <form action="/gestion_usuarios/accion" method="post" onsubmit="return confirm('¿Confirmas eliminar la cuenta de {{ u.nombre }}? Sus POs pasarán a tu perfil.');" class="inline m-0">
+                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                        <input type="hidden" name="accion" value="eliminar">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Eliminar</button>
+                    </form>
+                    {% else %}
+                    <span class="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">Sesión Blindada</span>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

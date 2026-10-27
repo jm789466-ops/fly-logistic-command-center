@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <h2 class="text-2xl font-extrabold fly-text">Configuración de Cuenta y Servidor de Correo</h2>
+    {% if error %}
+    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 rounded">{{ error }}</div>
+    {% endif %}
+
+    <div class="bg-white shadow-sm border border-slate-200 rounded-xl p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <span class="text-xs uppercase font-bold text-slate-400 block">Identidad</span>
+                <span class="font-extrabold text-slate-900">{{ user.nombre }}</span>
+            </div>
+            <div>
+                <span class="text-xs uppercase font-bold text-slate-400 block">Usuario Login</span>
+                <span class="font-mono font-bold text-blue-900">{{ user.username }}</span>
+            </div>
+            <div>
+                <span class="text-xs uppercase font-bold text-slate-400 block">Rango</span>
+                <span class="bg-blue-100 text-blue-800 px-3 py-0.5 rounded-full text-xs font-extrabold">{{ user.rol }}</span>
+            </div>
+        </div>
+
+        <form action="/perfil/correo" method="post" class="border-t pt-4">
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Correo de Recepción de Alertas</label>
+            <div class="flex gap-2">
+                <input type="email" name="email" value="{{ user.email or 'support1@eagleaeronauticalsupport.com' }}" required class="flex-grow border p-2.5 rounded-lg text-sm">
+                <button type="submit" class="fly-bg text-white px-5 rounded-lg text-sm font-bold">Guardar Correo</button>
+            </div>
+        </form>
+    </div>
+
+    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+    <div class="bg-white shadow-sm border border-slate-200 border-t-4 border-t-[#002060] rounded-xl p-6">
+        <h3 class="text-sm font-extrabold uppercase text-[#002060] mb-1">Motor de Salida SMTP y Prueba Real en Vivo</h3>
+        <p class="text-xs text-slate-500 mb-4">Configura la clave real de tu correo corporativo o contraseña de aplicación para despachar correos en tiempo real.</p>
+        <form action="/perfil/smtp" method="post" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Servidor SMTP (Host)</label>
+                    <input type="text" name="smtp_host" value="{{ cfg_smtp.get('host', 'mail.eagleaeronauticalsupport.com') }}" class="w-full border p-2 rounded-lg text-sm" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Puerto (465 SSL / 587 TLS)</label>
+                    <input type="number" name="smtp_port" value="{{ cfg_smtp.get('port', 465) }}" class="w-full border p-2 rounded-lg text-sm" required>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Cuenta Emisora</label>
+                    <input type="email" name="smtp_user" value="{{ cfg_smtp.get('user', 'support1@eagleaeronauticalsupport.com') }}" class="w-full border p-2 rounded-lg text-sm" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Contraseña SMTP / Clave de Correo</label>
+                    <input type="password" name="smtp_pass" value="{{ cfg_smtp.get('password', 'Colombia2024*') }}" class="w-full border p-2 rounded-lg text-sm" required>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Enviar Correo de Prueba Real a:</label>
+                <input type="email" name="destino_prueba" value="{{ user.email or 'support1@eagleaeronauticalsupport.com' }}" class="w-full border p-2 rounded-lg text-sm">
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" name="accion_smtp" value="guardar" class="fly-bg fly-hover text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">
+                    Guardar Credenciales SMTP
+                </button>
+                <button type="submit" name="accion_smtp" value="probar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow">
+                    ✉ Ejecutar Prueba Real de Correo Ahora
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="bg-white shadow-sm border border-slate-200 rounded-xl p-6">
+        <h3 class="text-sm font-bold uppercase text-[#002060] mb-4">Actualizar Contraseña de Acceso</h3>
+        <form action="/perfil/clave" method="post" class="space-y-4">
+            <div><label class="block text-xs font-semibold">Contraseña Actual</label><input type="password" name="actual" class="mt-1 w-full border p-2.5 rounded-lg" required></div>
+            <div><label class="block text-xs font-semibold">Nueva Contraseña (mín. 8 caracteres)</label><input type="password" name="password" class="mt-1 w-full border p-2.5 rounded-lg" required></div>
+            <div><label class="block text-xs font-semibold">Repetir Nueva Contraseña</label><input type="password" name="password2" class="mt-1 w-full border p-2.5 rounded-lg" required></div>
+            <button type="submit" class="fly-bg fly-hover text-white px-6 py-2.5 rounded-lg text-sm font-bold">Guardar Nueva Contraseña</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

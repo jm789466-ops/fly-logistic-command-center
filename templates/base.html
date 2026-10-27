@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>{% block title %}Fly Logistic · Command Center{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fly-gradient { background: linear-gradient(135deg, #001233 0%, #002060 55%, #1e3a8a 100%); }
+        .fly-bg { background-color: #002060; }
+        .fly-text { color: #002060; }
+        .fly-hover:hover { background-color: #001540; }
+    </style>
+</head>
+<body class="bg-slate-50 flex flex-col min-h-screen text-slate-800">
+    {% if user %}
+    <nav class="fly-gradient text-white shadow-lg border-b border-blue-900">
+        <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-8">
+                <a href="/pedidos" class="flex items-center gap-2.5">
+                    <span class="bg-sky-500 text-white font-extrabold px-2.5 py-1 rounded text-sm tracking-widest shadow">FLY</span>
+                    <div>
+                        <span class="text-xl font-extrabold tracking-wider uppercase block leading-none">LOGISTIC</span>
+                        <span class="text-[10px] text-sky-300 tracking-widest uppercase block">Aero Command Center</span>
+                    </div>
+                </a>
+                <div class="hidden md:flex space-x-1 text-sm font-medium">
+                    <a href="/pedidos" class="px-3 py-2 rounded-md hover:bg-white/10 transition">Órdenes de Compra (PO)</a>
+                    <a href="/pedidos/nuevo" class="px-3 py-2 rounded-md hover:bg-white/10 transition">+ Crear PO</a>
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                        <a href="/informes" class="px-3 py-2 rounded-md bg-sky-500/20 text-sky-200 hover:bg-sky-500/30 transition font-semibold">BI & Inteligencia</a>
+                    {% endif %}
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area', 'Supervisión'] %}
+                        <a href="/gestion_usuarios" class="px-3 py-2 rounded-md hover:bg-white/10 transition">Perfiles y Accesos</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="/perfil" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-lg transition text-sm">
+                    <span class="font-semibold">{{ user.nombre }}</span>
+                    <span class="text-xs bg-sky-500 text-white px-2.5 py-0.5 rounded-full font-bold">{{ user.rol }}</span>
+                </a>
+                <form action="/logout" method="post" class="m-0">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg transition text-xs font-bold uppercase tracking-wider">Salir</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8">
+        {% if flash %}
+        <div class="mb-6 p-4 rounded-xl text-white flex items-center justify-between {% if flash.ok %}bg-emerald-600{% else %}bg-red-600{% endif %} shadow-md">
+            <span class="font-medium">{{ flash.msg }}</span>
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="fly-gradient text-slate-300 text-center py-4 mt-auto border-t border-blue-900">
+        <p class="text-xs tracking-wide">&copy; 2026 Fly Logistic S.A.S. &middot; Eagle Aeronautical Support LLC &middot; Command Center &middot; support1@eagleaeronauticalsupport.com</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
+    <h1 class="text-3xl font-extrabold text-blue-600 text-center mb-8">
+        {% if modo == 'nuevo' %}Nueva orden de compra{% else %}Editar orden de compra · PO {{ pedido.po }}{% endif %}
+    </h1>
+
+    {% if error %}
+    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm font-semibold">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="" id="po-form">
+        <div class="mb-8">
+            <h2 class="text-lg font-bold text-blue-600 border-b border-slate-200 pb-2 mb-4">1. Información del Pedido y Cliente</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Fecha Inicial:</label>
+                    <input type="date" name="fecha_inicial" id="fecha_inicial" value="{{ d.get('fecha_inicial', '') }}" onchange="calcularSemaforoDias()" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">PO (Orden de Compra):</label>
+                    <input type="text" name="po_numero" id="po_numero" value="{{ d.get('po_numero', '') }}" oninput="calcularSemaforoDias()" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm {% if modo == 'editar' %}bg-slate-100 font-bold{% endif %}" {% if modo == 'editar' %}readonly{% endif %} required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Cliente:</label>
+                    <input type="text" name="cliente" value="{{ d.get('cliente', '') }}" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Asesor Responsable:</label>
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                    <select name="asesor_asignado_id" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm bg-slate-50 font-medium">
+                        {% for a in asesores_disponibles %}
+                        <option value="{{ a.id }}" {% if d.get('asesor_asignado_id') == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <input type="text" value="{{ user.nombre }}" class="w-full border border-slate-200 bg-slate-100 px-3.5 py-2.5 rounded-lg text-sm text-slate-600" readonly>
+                    <input type="hidden" name="asesor_asignado_id" value="{{ user.id }}">
+                    {% endif %}
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Tipo de Pedido:</label>
+                    <select name="tipo_pedido" id="tipo_pedido" onchange="cambiarTipoPedido(true)" class="w-full border-2 border-blue-500 px-3.5 py-2.5 rounded-lg text-sm font-semibold text-blue-700 bg-white" {% if modo == 'editar' %}readonly style="pointer-events: none;"{% endif %}>
+                        <option value="Nacional" {% if d.get('tipo_pedido') == 'Nacional' %}selected{% endif %}>Operación Nacional (IVA 19%)</option>
+                        <option value="Internacional" {% if d.get('tipo_pedido') == 'Internacional' %}selected{% endif %}>Operación Internacional (TAX 7%)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <h2 class="text-lg font-bold text-blue-600 border-b border-slate-200 pb-2 mb-4">2. Detalles de los Productos</h2>
+            <div id="items-container" class="space-y-4 mb-4">
+                {% set lista_items = d.get('items') if d.get('items') else [{'fecha_compra_prov': '', 'proveedor': '', 'parte_numero': '', 'parte_numero_alterno': '', 'unidad_medida': 'UND', 'descripcion': '', 'cantidad': '1', 'precio_unitario': '', 'iva_item': '19'}] %}
+                {% for item in lista_items %}
+                <div class="item-row relative bg-slate-50/70 border border-slate-200 border-l-4 border-l-blue-600 rounded-xl p-5 shadow-sm">
+                    <button type="button" onclick="eliminarItem(this)" class="absolute top-3 right-3 bg-red-100 hover:bg-red-200 text-red-600 w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs" title="Eliminar producto">✕</button>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de compra a proveedores:</label>
+                            <input type="date" name="fecha_compra_prov" value="{{ item.get('fecha_compra_prov', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Proveedor (Origen):</label>
+                            <input type="text" name="proveedor" value="{{ item.get('proveedor', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white" required>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Parte número por producto (SKU):</label>
+                            <input type="text" name="parte_numero" value="{{ item.get('parte_numero', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white font-semibold" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Parte número alterno (Opcional):</label>
+                            <input type="text" name="parte_numero_alterno" value="{{ item.get('parte_numero_alterno', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Unidad de medida:</label>
+                            <select name="unidad_medida" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white font-medium">
+                                {% for um in unidades_medida %}
+                                <option value="{{ um }}" {% if item.get('unidad_medida', 'UND') == um %}selected{% endif %}>{{ um }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Descripción del producto:</label>
+                        <input type="text" name="descripcion" value="{{ item.get('descripcion', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white" required>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Cantidad (Unidades):</label>
+                            <input type="number" name="cantidad" value="{{ item.get('cantidad', '1') }}" min="1" oninput="recalcularTotales()" class="item-cant w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white font-semibold" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Precio unitario inicial ($):</label>
+                            <input type="number" step="0.01" min="0" name="precio_unitario" value="{{ item.get('precio_unitario', '') }}" oninput="recalcularTotales()" class="item-precio w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white font-semibold" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-blue-700 mb-1"><span class="etiqueta-impuesto-item">IVA / TAX</span> Producto (%):</label>
+                            <input type="number" step="0.01" min="0" max="100" name="iva_item" value="{{ item.get('iva_item', d.get('iva_porcentaje', '19')) }}" oninput="recalcularTotales()" class="item-iva w-full border border-blue-300 px-3 py-2 rounded-lg text-sm bg-blue-50 font-bold text-blue-900" required>
+                        </div>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-right">
+                            <span class="block text-[10px] uppercase font-bold text-slate-400">Total Producto c/Impuesto</span>
+                            <span class="item-total-preview text-sm font-extrabold text-[#002060]">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button type="button" onclick="agregarItem()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold shadow-sm transition">
+                + Agregar otro producto
+            </button>
+        </div>
+
+        <div class="mb-8">
+            <h2 class="text-lg font-bold text-blue-600 border-b border-slate-200 pb-2 mb-4">3. Valores y Facturación</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-4">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Método de pago (Multiselector):</label>
+                    {% set metodos_actuales = d.get('metodo_pago', '') %}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-2">
+                        {% for mp in metodos_pago_opciones %}
+                        <label class="flex items-center gap-2 border border-slate-300 rounded-lg px-3 py-2 cursor-pointer hover:bg-blue-50 transition text-sm font-medium bg-white">
+                            <input type="checkbox" name="metodos_pago_check" value="{{ mp }}" onchange="sincronizarMetodosPago()" {% if mp.lower() in metodos_actuales.lower() %}checked{% endif %} class="metodo-check rounded text-blue-600 focus:ring-blue-500">
+                            <span>{{ mp }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <input type="text" name="metodo_pago" id="metodo_pago_texto" value="{{ d.get('metodo_pago', '') }}" class="w-full border border-slate-300 px-3.5 py-2 rounded-lg text-xs bg-slate-50">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5" id="label_iva_base">IVA Aplicado (%) [19% Nac. / 7% TAX Intl.]:</label>
+                    <input type="number" step="0.01" name="iva_porcentaje" id="iva_porcentaje_base" value="{{ d.get('iva_porcentaje', '19') }}" oninput="aplicarIvaATodos()" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm font-bold text-blue-800 bg-blue-50/50" required>
+                    <p class="text-[11px] text-slate-500 mt-1">Vinculado automáticamente al valor inicial y a cada producto.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-900 text-white p-4 rounded-xl shadow-inner">
+                <div>
+                    <span class="text-[11px] uppercase text-slate-400 block">Valor Inicial (Subtotal)</span>
+                    <span id="resumen-subtotal" class="text-lg font-bold">$0.00</span>
+                </div>
+                <div>
+                    <span class="text-[11px] uppercase text-slate-400 block" id="resumen-label-impuesto">Total IVA (19%) / TAX (7%)</span>
+                    <span id="resumen-impuestos" class="text-lg font-bold text-sky-400">$0.00</span>
+                </div>
+                <div>
+                    <span class="text-[11px] uppercase text-slate-400 block">Valor Nacionalización</span>
+                    <span id="resumen-nacionalizacion" class="text-lg font-bold text-amber-400">$0.00</span>
+                </div>
+                <div class="border-l border-slate-700 pl-3">
+                    <span class="text-[11px] uppercase text-emerald-300 block font-bold">Valor Final Total</span>
+                    <span id="resumen-gran-total" class="text-xl font-extrabold text-emerald-400">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <h2 class="text-lg font-bold text-blue-600 border-b border-slate-200 pb-2 mb-4">5. Cierre y Control</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Documentación adjunta (Ruta/Factura):</label>
+                    <input type="text" name="documentacion" value="{{ d.get('documentacion', '') }}" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Estado General:</label>
+                    <select name="estado_general" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm bg-white font-semibold">
+                        {% for est in estados %}
+                        <option value="{{ est }}" {% if d.get('estado_general') == est %}selected{% endif %}>{{ est }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Observaciones o Notas Excepcionales:</label>
+                <textarea name="observaciones" rows="3" class="w-full border border-slate-300 p-3.5 rounded-lg text-sm">{{ d.get('observaciones', '') }}</textarea>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <div class="flex flex-wrap justify-between items-center border-b border-slate-200 pb-2 mb-4">
+                <h2 class="text-lg font-bold text-blue-600">4. Logística y Entregas</h2>
+                <div id="badge-semaforo-form" class="px-3.5 py-1 rounded-full text-xs font-extrabold bg-slate-200 text-slate-700">
+                    Selecciona el plazo de entrega para calcular días hábiles
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Plazo de entrega prometido:</label>
+                    <input type="date" name="plazo_entrega" id="plazo_entrega" value="{{ d.get('plazo_entrega', '') }}" onchange="calcularSemaforoDias()" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Fecha de entrega al cliente:</label>
+                    <input type="date" name="fecha_entrega_cliente" id="fecha_entrega_cliente" value="{{ d.get('fecha_entrega_cliente', '') }}" onchange="calcularSemaforoDias()" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Número de remisión:</label>
+                    <input type="text" name="numero_remision" value="{{ d.get('numero_remision', '') }}" class="w-full border border-slate-300 px-3.5 py-2.5 rounded-lg text-sm">
+                </div>
+            </div>
+
+            <div id="bloque-internacional" class="bg-sky-50/80 border border-sky-200 rounded-xl p-5 mt-4">
+                <h3 class="text-xs font-extrabold uppercase tracking-wider text-sky-900 mb-3">Logística Internacional, Click Mail (Opcional) y Nacionalización</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">¿El pedido llega a Click Mail?:</label>
+                        <select name="llega_click_mail" id="llega_click_mail" onchange="toggleClickMail()" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white font-semibold">
+                            <option value="No" {% if d.get('llega_click_mail', 'No') == 'No' %}selected{% endif %}>No (Envío directo / No aplica)</option>
+                            <option value="Si" {% if d.get('llega_click_mail') == 'Si' %}selected{% endif %}>Sí llega a Click Mail</option>
+                        </select>
+                    </div>
+                    <div id="contenedor-fecha-cm">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Fecha en la que llega a Click Mail:</label>
+                        <input type="date" name="fecha_click_mail" id="fecha_click_mail" value="{{ d.get('fecha_click_mail', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tracking Internacional:</label>
+                        <input type="text" name="tracking" value="{{ d.get('tracking', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Estado de Nacionalización:</label>
+                        <select name="estado_nacionalizacion" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                            {% for est in estados_aduana %}
+                            <option value="{{ est }}" {% if d.get('estado_nacionalizacion') == est %}selected{% endif %}>{{ est }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Fecha de Nacionalización (Opcional):</label>
+                        <input type="date" name="fecha_nacionaliza" value="{{ d.get('fecha_nacionaliza', '') }}" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-amber-800 mb-1">Valor de la Nacionalización ($):</label>
+                        <input type="number" step="0.01" min="0" name="valor_nacionalizacion" id="valor_nacionalizacion" value="{{ d.get('valor_nacionalizacion', '0.00') }}" oninput="recalcularTotales()" class="w-full border border-amber-400 px-3 py-2 rounded-lg text-sm bg-amber-50 font-bold text-amber-900">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">
+            Procesar Pedido y Generar Excel a Drive
+        </button>
+
+        <div class="text-center mt-4">
+            <a href="/pedidos" class="text-sm text-indigo-800 hover:underline font-medium">← Volver a mis pedidos</a>
+        </div>
+    </form>
+</div>
+
+<script>
+function sincronizarMetodosPago() {
+    const checks = document.querySelectorAll('.metodo-check:checked');
+    const seleccionados = Array.from(checks).map(c => c.value);
+    document.getElementById('metodo_pago_texto').value = seleccionados.join(', ');
+}
+
+function cambiarTipoPedido(actualizarImpuesto) {
+    const tipo = document.getElementById('tipo_pedido').value;
+    const bloqueIntl = document.getElementById('bloque-internacional');
+    const inputIvaBase = document.getElementById('iva_porcentaje_base');
+    const labelIvaBase = document.getElementById('label_iva_base');
+
+    if (tipo === 'Internacional') {
+        bloqueIntl.style.display = 'block';
+        labelIvaBase.textContent = 'TAX Internacional Aplicado (%) [Por defecto 7%]:';
+        if (actualizarImpuesto) {
+            inputIvaBase.value = '7';
+            aplicarIvaATodos();
+        }
+    } else {
+        bloqueIntl.style.display = 'none';
+        labelIvaBase.textContent = 'IVA Nacional Aplicado (%) [Por defecto 19%]:';
+        document.getElementById('valor_nacionalizacion').value = '0.00';
+        if (actualizarImpuesto) {
+            inputIvaBase.value = '19';
+            aplicarIvaATodos();
+        }
+    }
+    toggleClickMail();
+    recalcularTotales();
+}
+
+function toggleClickMail() {
+    const llega = document.getElementById('llega_click_mail').value;
+    const contFecha = document.getElementById('contenedor-fecha-cm');
+    const inputFecha = document.getElementById('fecha_click_mail');
+    if (llega === 'Si') {
+        contFecha.style.opacity = '1';
+        inputFecha.disabled = false;
+    } else {
+        contFecha.style.opacity = '0.45';
+        inputFecha.value = '';
+        inputFecha.disabled = true;
+    }
+}
+
+function aplicarIvaATodos() {
+    const ivaBase = document.getElementById('iva_porcentaje_base').value || '0';
+    document.querySelectorAll('.item-iva').forEach(inp => {
+        inp.value = ivaBase;
+    });
+    recalcularTotales();
+}
+
+function recalcularTotales() {
+    let subtotalGeneral = 0;
+    let impuestosGeneral = 0;
+    const tipo = document.getElementById('tipo_pedido').value;
+
+    document.querySelectorAll('.item-row').forEach(row => {
+        const cant = parseFloat(row.querySelector('.item-cant').value) || 0;
+        const precio = parseFloat(row.querySelector('.item-precio').value) || 0;
+        const iva = parseFloat(row.querySelector('.item-iva').value) || 0;
+
+        const sub = cant * precio;
+        const imp = sub * (iva / 100.0);
+        const tot = sub + imp;
+
+        subtotalGeneral += sub;
+        impuestosGeneral += imp;
+
+        const preview = row.querySelector('.item-total-preview');
+        if (preview) {
+            preview.textContent = '$' + tot.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+    });
+
+    const valNac = (tipo === 'Internacional') ? (parseFloat(document.getElementById('valor_nacionalizacion').value) || 0) : 0;
+    const granTotal = subtotalGeneral + impuestosGeneral + valNac;
+
+    document.getElementById('resumen-subtotal').textContent = '$' + subtotalGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('resumen-impuestos').textContent = '$' + impuestosGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('resumen-nacionalizacion').textContent = '$' + valNac.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('resumen-gran-total').textContent = '$' + granTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function agregarItem() {
+    const container = document.getElementById('items-container');
+    const rows = container.querySelectorAll('.item-row');
+    if (rows.length === 0) return;
+    const newRow = rows[0].cloneNode(true);
+    const ivaBase = document.getElementById('iva_porcentaje_base').value || '19';
+    newRow.querySelectorAll('input').forEach(input => {
+        if (input.name === 'cantidad') input.value = '1';
+        else if (input.name === 'iva_item') input.value = ivaBase;
+        else input.value = '';
+    });
+    container.appendChild(newRow);
+    recalcularTotales();
+}
+
+function eliminarItem(btn) {
+    const container = document.getElementById('items-container');
+    if (container.querySelectorAll('.item-row').length > 1) {
+        btn.closest('.item-row').remove();
+        recalcularTotales();
+    }
+}
+
+function calcularSemaforoDias() {
+    const plazoTxt = document.getElementById('plazo_entrega').value;
+    const entregaTxt = document.getElementById('fecha_entrega_cliente').value;
+    const poTxt = document.getElementById('po_numero').value || 'ACTUAL';
+    const badge = document.getElementById('badge-semaforo-form');
+
+    if (!plazoTxt) {
+        badge.className = 'px-3.5 py-1 rounded-full text-xs font-extrabold bg-slate-200 text-slate-700';
+        badge.textContent = 'Sin plazo de entrega definido';
+        return;
+    }
+
+    const plazo = new Date(plazoTxt + 'T00:00:00');
+    const ref = entregaTxt ? new Date(entregaTxt + 'T00:00:00') : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+
+    let signo = plazo >= ref ? 1 : -1;
+    let actual = new Date(ref);
+    let dias = 0;
+    while (actual.getTime() !== plazo.getTime()) {
+        actual.setDate(actual.getDate() + signo);
+        const diaSemana = actual.getDay();
+        if (diaSemana !== 0 && diaSemana !== 6) {
+            dias += signo;
+        }
+    }
+
+    if (dias >= 0) {
+        const palabra = (dias === 1) ? 'DÍA HÁBIL' : 'DÍAS HÁBILES';
+        badge.className = 'px-4 py-1.5 rounded-full text-xs font-extrabold bg-emerald-600 text-white shadow';
+        badge.textContent = `PO ${poTxt} · ${dias} ${palabra} A FAVOR`;
+    } else {
+        const dAbs = Math.abs(dias);
+        const palabra = (dAbs === 1) ? 'DÍA EN CONTRA' : 'DÍAS EN CONTRA';
+        badge.className = 'px-4 py-1.5 rounded-full text-xs font-extrabold bg-red-600 text-white shadow';
+        badge.textContent = `PO ${poTxt} · ${dAbs} ${palabra}`;
+    }
+}
+
+cambiarTipoPedido(false);
+calcularSemaforoDias();
+</script>
+{% endblock %}
