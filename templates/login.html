@@ -1,34 +1,36 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-md mx-auto mt-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-    <div class="fly-gradient px-8 py-6 text-center text-white">
-        <span class="bg-sky-500 text-xs font-extrabold px-2.5 py-1 rounded uppercase tracking-widest">Plataforma Ejecutiva</span>
-        <h1 class="text-2xl font-extrabold uppercase tracking-wider mt-2">FLY LOGISTIC</h1>
-        <p class="text-sky-200 text-xs mt-1">Aero Command Center &middot; Gestión Nacional e Internacional</p>
+<div class="max-w-md mx-auto mt-6 sm:mt-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+    <div class="fly-bg px-6 sm:px-8 py-6 text-center text-white">
+        <div class="inline-flex items-center justify-center bg-white px-4 py-2 rounded-xl shadow mb-3">
+            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-10 sm:h-11 w-auto object-contain">
+        </div>
+        <h1 class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-white">FLY LOGISTIC S.A.S.</h1>
+        <p class="text-sky-200 text-xs mt-1 font-medium">Sistema Corporativo de Gestión de Órdenes (OMS)</p>
     </div>
 
-    <div class="p-8">
+    <div class="p-6 sm:p-8">
         {% if error %}
-        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-6 text-sm rounded">
+        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-6 text-xs font-semibold rounded">
             {{ error }}
         </div>
         {% endif %}
 
         <form method="post" action="/login" class="space-y-5">
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Usuario Corporativo</label>
-                <input type="text" name="username" value="{{ username }}" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#002060] focus:outline-none" required autofocus>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Usuario Corporativo</label>
+                <input type="text" name="username" value="{{ username }}" placeholder="Ingrese su usuario" class="w-full h-10 px-3.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#002060] focus:outline-none text-sm" required autofocus>
             </div>
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Contraseña</label>
-                <input type="password" name="password" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#002060] focus:outline-none" required>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Contraseña de Acceso</label>
+                <input type="password" name="password" placeholder="Ingrese su contraseña" class="w-full h-10 px-3.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#002060] focus:outline-none text-sm" required>
             </div>
-            <div class="flex items-center justify-between text-xs">
-                <a href="/olvide" class="text-blue-700 hover:underline font-semibold">Restablecer clave (Directivos)</a>
-                <a href="/registro" class="text-slate-600 hover:underline font-medium">Registrar cuenta de asesor →</a>
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <a href="/olvide" class="text-blue-700 hover:underline font-semibold">Recuperar contraseña</a>
+                <a href="/registro" class="text-slate-600 hover:underline font-semibold">Solicitar alta de asesor</a>
             </div>
-            <button type="submit" class="w-full py-3 px-4 rounded-lg shadow text-sm font-bold text-white fly-bg fly-hover transition uppercase tracking-wider">
-                Ingresar al Centro de Mando
+            <button type="submit" class="w-full py-3 px-4 rounded-lg shadow text-xs font-extrabold text-white fly-bg fly-hover transition uppercase tracking-wider">
+                Iniciar Sesión en la Plataforma
             </button>
         </form>
     </div>

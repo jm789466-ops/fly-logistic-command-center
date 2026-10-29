@@ -1,64 +1,95 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>{% block title %}Fly Logistic · Command Center{% endblock %}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fly Logistic S.A.S. | Gestión de Órdenes (OMS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .fly-gradient { background: linear-gradient(135deg, #001233 0%, #002060 55%, #1e3a8a 100%); }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         .fly-bg { background-color: #002060; }
-        .fly-text { color: #002060; }
+        .fly-gradient { background: linear-gradient(135deg, #002060 0%, #001238 100%); }
         .fly-hover:hover { background-color: #001540; }
+        .fly-text { color: #002060; }
     </style>
 </head>
-<body class="bg-slate-50 flex flex-col min-h-screen text-slate-800">
-    {% if user %}
-    <nav class="fly-gradient text-white shadow-lg border-b border-blue-900">
-        <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center space-x-8">
-                <a href="/pedidos" class="flex items-center gap-2.5">
-                    <span class="bg-sky-500 text-white font-extrabold px-2.5 py-1 rounded text-sm tracking-widest shadow">FLY</span>
-                    <div>
-                        <span class="text-xl font-extrabold tracking-wider uppercase block leading-none">LOGISTIC</span>
-                        <span class="text-[10px] text-sky-300 tracking-widest uppercase block">Aero Command Center</span>
-                    </div>
-                </a>
-                <div class="hidden md:flex space-x-1 text-sm font-medium">
-                    <a href="/pedidos" class="px-3 py-2 rounded-md hover:bg-white/10 transition">Órdenes de Compra (PO)</a>
-                    <a href="/pedidos/nuevo" class="px-3 py-2 rounded-md hover:bg-white/10 transition">+ Crear PO</a>
-                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                        <a href="/informes" class="px-3 py-2 rounded-md bg-sky-500/20 text-sky-200 hover:bg-sky-500/30 transition font-semibold">BI & Inteligencia</a>
-                    {% endif %}
-                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area', 'Supervisión'] %}
-                        <a href="/gestion_usuarios" class="px-3 py-2 rounded-md hover:bg-white/10 transition">Perfiles y Accesos</a>
-                    {% endif %}
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+    {% if user is defined and user %}
+    <header class="fly-bg text-white shadow-md sticky top-0 z-50 border-b border-white/10">
+        <div class="max-w-[1600px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+            <a href="/pedidos" class="flex items-center gap-3 shrink-0">
+                <div class="bg-white rounded-lg px-2.5 py-1 flex items-center justify-center shadow-sm">
+                    <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-7 sm:h-8 w-auto object-contain">
                 </div>
-            </div>
-            <div class="flex items-center space-x-4">
-                <a href="/perfil" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-lg transition text-sm">
-                    <span class="font-semibold">{{ user.nombre }}</span>
-                    <span class="text-xs bg-sky-500 text-white px-2.5 py-0.5 rounded-full font-bold">{{ user.rol }}</span>
+                <div class="leading-tight">
+                    <span class="font-extrabold text-sm sm:text-base tracking-tight block">FLY LOGISTIC S.A.S.</span>
+                    <span class="text-[10px] text-sky-300 uppercase tracking-widest block font-semibold">Gestión de Órdenes</span>
+                </div>
+            </a>
+
+            <nav class="hidden xl:flex items-center gap-1.5 text-xs font-semibold">
+                <a href="/pedidos" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Órdenes de Compra</a>
+                <a href="/pedidos/nuevo" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Nueva Orden</a>
+                <a href="/pedidos/consolidado/excel" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                    <span>Consolidado Excel</span>
                 </a>
-                <form action="/logout" method="post" class="m-0">
-                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg transition text-xs font-bold uppercase tracking-wider">Salir</button>
-                </form>
+                {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                <a href="/supervision" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Supervisión de Cartera</a>
+                <a href="/informes" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Indicadores</a>
+                <a href="/gestion_usuarios" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Usuarios</a>
+                {% endif %}
+            </nav>
+
+            <div class="hidden sm:flex items-center gap-2.5 shrink-0">
+                <a href="/perfil" class="bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 transition">
+                    <span class="font-semibold truncate max-w-[170px]">{{ user.nombre }}</span>
+                    <span class="bg-sky-400 text-[#002060] px-2 py-0.5 rounded text-[10px] font-extrabold uppercase">{{ user.rol }}</span>
+                </a>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">Salir</a>
+            </div>
+
+            <button type="button" onclick="document.getElementById('menu-movil').classList.toggle('hidden')" class="xl:hidden bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white focus:outline-none" aria-label="Menú">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="menu-movil" class="hidden xl:hidden px-4 pt-2 pb-4 border-t border-white/10 space-y-1.5 text-xs font-semibold bg-[#001848]">
+            <div class="flex items-center justify-between bg-white/10 px-3 py-2 rounded-lg mb-2 sm:hidden">
+                <a href="/perfil" class="truncate font-bold text-white">{{ user.nombre }}</a>
+                <span class="bg-sky-400 text-[#002060] px-2 py-0.5 rounded text-[10px] font-extrabold uppercase">{{ user.rol }}</span>
+            </div>
+            <a href="/pedidos" class="block px-3 py-2 rounded-lg hover:bg-white/10">Órdenes de Compra</a>
+            <a href="/pedidos/nuevo" class="block px-3 py-2 rounded-lg hover:bg-white/10">Registrar Nueva Orden</a>
+            <a href="/pedidos/consolidado/excel" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                <span>Descargar Consolidado Excel</span>
+            </a>
+            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+            <a href="/supervision" class="block px-3 py-2 rounded-lg hover:bg-white/10">Supervisión y Reasignación</a>
+            <a href="/informes" class="block px-3 py-2 rounded-lg hover:bg-white/10">Indicadores Gerenciales</a>
+            <a href="/gestion_usuarios" class="block px-3 py-2 rounded-lg hover:bg-white/10">Gestión de Usuarios</a>
+            {% endif %}
+            <div class="pt-2 flex gap-2 sm:hidden">
+                <a href="/perfil" class="flex-1 text-center bg-white/15 py-2 rounded-lg">Mi Perfil</a>
+                <a href="/logout" class="flex-1 text-center bg-red-600 py-2 rounded-lg text-white font-bold">Cerrar Sesión</a>
             </div>
         </div>
-    </nav>
+    </header>
     {% endif %}
 
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-8">
+    <main class="flex-grow max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {% if flash %}
-        <div class="mb-6 p-4 rounded-xl text-white flex items-center justify-between {% if flash.ok %}bg-emerald-600{% else %}bg-red-600{% endif %} shadow-md">
-            <span class="font-medium">{{ flash.msg }}</span>
+        <div class="mb-4 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold shadow-sm border {% if flash.ok %}bg-emerald-50 border-emerald-300 text-emerald-800{% else %}bg-red-50 border-red-300 text-red-700{% endif %}">
+            {{ flash.msg }}
         </div>
         {% endif %}
         {% block content %}{% endblock %}
     </main>
-
-    <footer class="fly-gradient text-slate-300 text-center py-4 mt-auto border-t border-blue-900">
-        <p class="text-xs tracking-wide">&copy; 2026 Fly Logistic S.A.S. &middot; Eagle Aeronautical Support LLC &middot; Command Center &middot; support1@eagleaeronauticalsupport.com</p>
-    </footer>
 </body>
 </html>

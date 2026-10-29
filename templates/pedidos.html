@@ -1,135 +1,441 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-    <div>
-        <h2 class="text-2xl font-extrabold fly-text">Centro de Mando · Órdenes de Compra (PO)</h2>
-        <p class="text-sm text-slate-500">Monitoreo ejecutivo de días hábiles a favor (verde) y en contra (rojo)</p>
-    </div>
-    <div class="flex flex-wrap gap-2">
-        <form action="/pedidos/notificar_proximos" method="post" class="m-0">
-            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow transition uppercase tracking-wider">
-                ✉ Despachar Seguimiento Diario por Correo
-            </button>
-        </form>
-        <a href="/pedidos/nuevo" class="fly-bg fly-hover text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow transition">
-            + Registrar Nueva PO
-        </a>
-    </div>
-</div>
-
-{% if pedidos %}
-<div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
-    <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Semáforo Ejecutivo de Tiempos de Entrega (Días Hábiles)</h3>
-    <div class="flex flex-wrap gap-2">
-        {% for p in pedidos %}
-            {% set info = p.dias_habiles_info %}
-            <a href="/pedidos/{{ p.id }}/editar" class="whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold shadow-sm transition inline-flex items-center
-                {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
-                {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
-                {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
-                {{ info.etiqueta }}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-4 border-b border-slate-200">
+        <div>
+            <h2 class="text-lg sm:text-xl font-extrabold fly-text">Control de Órdenes de Compra (PO)</h2>
+            <p class="text-xs text-slate-500">Listado operativo ordenado por prioridad de entrega (15 registros por página)</p>
+        </div>
+        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+            <a href="/pedidos/consolidado/excel{% if asesor_f %}?asesor_id={{ asesor_f }}{% endif %}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                <span>Consolidado POs</span>
             </a>
-        {% endfor %}
+            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+            <a href="/informes/productos_excel" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                <span>Maestro de Ítems</span>
+            </a>
+            <form action="/pedidos/notificar_proximos" method="post" class="m-0 col-span-2 sm:col-auto">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>Notificar Pendientes</span>
+                </button>
+            </form>
+            {% endif %}
+            <a href="/pedidos/nuevo" class="col-span-2 sm:col-auto fly-bg fly-hover text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <span>+ Nueva Orden</span>
+            </a>
+        </div>
     </div>
-</div>
-{% endif %}
 
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
-    <form method="get" action="/pedidos" class="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por número de PO o Cliente..." class="px-4 py-2 border rounded-lg text-sm">
-        <select name="tipo" class="px-3 py-2 border rounded-lg text-sm bg-white">
-            <option value="">Todos los Tipos</option>
-            <option value="Nacional" {% if tipo_f == 'Nacional' %}selected{% endif %}>Operación Nacional</option>
-            <option value="Internacional" {% if tipo_f == 'Internacional' %}selected{% endif %}>Operación Internacional</option>
-        </select>
-        <select name="estado" class="px-3 py-2 border rounded-lg text-sm bg-white">
-            <option value="">Todos los Estados</option>
-            {% for e in estados %}
-            <option value="{{ e }}" {% if estado_f == e %}selected{% endif %}>{{ e }}</option>
+    {% if todos_pedidos %}
+    {% set ns = namespace(en_contra=0, a_favor=0, entregadas=0) %}
+    {% for p in todos_pedidos %}
+        {% if p.estado == 'Entregado' %}
+            {% set ns.entregadas = ns.entregadas + 1 %}
+        {% elif p.dias_habiles_info.en_contra %}
+            {% set ns.en_contra = ns.en_contra + 1 %}
+        {% else %}
+            {% set ns.a_favor = ns.a_favor + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="py-3 border-b border-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Resumen de Cartera:</span>
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                    Total: {{ total_pedidos }}
+                </span>
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                    Vencidas: {{ ns.en_contra }}
+                </span>
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    En Plazo: {{ ns.a_favor }}
+                </span>
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                    Entregadas: {{ ns.entregadas }}
+                </span>
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[10px] font-bold uppercase text-slate-400">Prioridad Inmediata:</span>
+                {% for p in todos_pedidos[:4] %}
+                    {% set info = p.dias_habiles_info %}
+                    <a href="/pedidos/{{ p.id }}/editar" class="px-2.5 py-1 rounded-md text-[10px] font-bold transition inline-flex items-center whitespace-nowrap
+                        {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
+                        {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
+                        {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
+                        {{ info.etiqueta }}
+                    </a>
+                {% endfor %}
+                {% if (todos_pedidos | length) > 4 %}
+                <button type="button" onclick="document.getElementById('modal-todas-prioridades').classList.toggle('hidden')" class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-800 hover:bg-slate-900 text-white transition whitespace-nowrap">
+                    Ver todas ({{ todos_pedidos | length }})
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if (todos_pedidos | length) > 4 %}
+        <div id="modal-todas-prioridades" class="hidden mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 rounded-lg border border-slate-200">
+            {% for p in todos_pedidos %}
+                {% set info = p.dias_habiles_info %}
+                <a href="/pedidos/{{ p.id }}/editar" class="px-2.5 py-1 rounded-md text-[10px] font-bold transition inline-flex items-center whitespace-nowrap
+                    {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
+                    {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
+                    {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
+                    {{ info.etiqueta }}
+                </a>
             {% endfor %}
-        </select>
-        <div class="flex gap-2">
-            <button type="submit" class="fly-bg text-white px-5 py-2 rounded-lg text-sm font-bold flex-grow">Filtrar</button>
-            <a href="/pedidos" class="bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-semibold">Todos</a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <form method="get" action="/pedidos" class="pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
+        <div class="lg:col-span-2">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Número de PO</label>
+            <input type="text" name="po" value="{{ po_f }}" placeholder="Ej. PO-2026-01" class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div class="lg:col-span-2">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Cliente</label>
+            <input type="text" name="cliente" value="{{ cliente_f }}" placeholder="Nombre del cliente..." class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div class="lg:col-span-2">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Proveedor</label>
+            <input type="text" name="proveedor" value="{{ proveedor_f }}" placeholder="Nombre del proveedor..." class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
+        </div>
+        {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+        <div class="lg:col-span-2">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Asesor Asignado</label>
+            <select name="asesor_id" class="w-full h-9 px-2.5 border border-slate-300 rounded-lg text-xs bg-white">
+                <option value="">Todos los Asesores</option>
+                {% for a in asesores_disponibles %}
+                <option value="{{ a.id }}" {% if asesor_f == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="{% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Operación</label>
+            <select name="tipo" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
+                <option value="">Todas</option>
+                <option value="Nacional" {% if tipo_f == 'Nacional' %}selected{% endif %}>Nacional</option>
+                <option value="Internacional" {% if tipo_f == 'Internacional' %}selected{% endif %}>Internacional</option>
+            </select>
+        </div>
+        <div class="{% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Estado PO</label>
+            <select name="estado" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
+                <option value="">Todos</option>
+                {% for e in estados %}
+                <option value="{{ e }}" {% if estado_f == e %}selected{% endif %}>{{ e }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lg:col-span-1">
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Estado Ítem</label>
+            <select name="estado_producto" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
+                <option value="">Todos</option>
+                {% for ep in estados_producto %}
+                <option value="{{ ep }}" {% if estado_prod_f == ep %}selected{% endif %}>{{ ep }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lg:col-span-1 flex gap-1.5">
+            <button type="submit" class="fly-bg fly-hover text-white h-9 px-3 rounded-lg text-xs font-bold flex-grow">Filtrar</button>
+            <a href="/pedidos" class="bg-slate-200 hover:bg-slate-300 text-slate-700 h-9 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center" title="Limpiar">Limpiar</a>
         </div>
     </form>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="fly-bg text-white text-xs uppercase">
-            <tr>
-                <th class="px-4 py-3.5 text-left whitespace-nowrap">PO / Semáforo Días Hábiles</th>
-                <th class="px-4 py-3.5 text-left whitespace-nowrap">Cliente</th>
-                <th class="px-4 py-3.5 text-left whitespace-nowrap">Operación / Pago</th>
-                <th class="px-4 py-3.5 text-left whitespace-nowrap">Responsable</th>
-                <th class="px-4 py-3.5 text-left whitespace-nowrap">Fechas Clave</th>
-                <th class="px-4 py-3.5 text-right whitespace-nowrap">Nacionalización</th>
-                <th class="px-4 py-3.5 text-right whitespace-nowrap">Total Final</th>
-                <th class="px-4 py-3.5 text-right whitespace-nowrap">Acciones</th>
+<!-- VISTA MÓVIL Y TABLET -->
+<div class="lg:hidden space-y-3 mb-4">
+    {% for p in pedidos %}
+    {% set info = p.dias_habiles_info %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="flex justify-between items-start gap-2 pb-2.5 border-b border-slate-100">
+            <div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="font-extrabold text-[#002060] text-sm">{{ p.po_codigo }}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold
+                        {% if info.color == 'emerald' %}bg-emerald-600 text-white
+                        {% elif info.color == 'red' %}bg-red-600 text-white
+                        {% else %}bg-slate-200 text-slate-700{% endif %}">
+                        {{ info.etiqueta }}
+                    </span>
+                </div>
+                <div class="text-xs font-bold text-slate-800 mt-1">{{ p.cliente.nombre }}</div>
+            </div>
+            <div class="text-right shrink-0">
+                <div class="font-extrabold text-slate-900 text-sm">{{ p.total | money }}</div>
+                <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
+                    {{ p.tipo }} | {{ p.estado }}
+                </span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600 py-2 border-b border-slate-100">
+            <div>Inicio: <strong class="text-slate-800">{{ p.fecha_inicial }}</strong></div>
+            <div>Prometido: <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
+            <div>Actualizado: <strong class="text-slate-800">{{ p.actualizado_en.strftime('%Y-%m-%d %H:%M') if p.actualizado_en else p.fecha_inicial }}</strong></div>
+            <div>Asesor: <strong class="text-slate-800">{{ p.asesor.nombre }}</strong></div>
+        </div>
+
+        <div class="py-2 space-y-1.5">
+            {% for it in p.items[:3] %}
+            <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2">
+                <div class="truncate">
+                    <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
+                    <span class="text-slate-600">| {{ it.descripcion }}</span>
+                </div>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0
+                    {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
+                    {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
+                    {% else %}bg-amber-100 text-amber-800{% endif %}">
+                    {{ it.estado_producto or 'PENDIENTE' }}
+                </span>
+            </div>
+            {% endfor %}
+            {% if (p.items | length) > 3 %}
+            <div id="items-extra-movil-{{ p.id }}" class="hidden space-y-1.5 pt-1">
+                {% for it in p.items[3:] %}
+                <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2">
+                    <div class="truncate">
+                        <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
+                        <span class="text-slate-600">| {{ it.descripcion }}</span>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0
+                        {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
+                        {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ it.estado_producto or 'PENDIENTE' }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" onclick="toggleItemsMovil({{ p.id }}, {{ (p.items | length) - 3 }})" id="btn-items-movil-{{ p.id }}" class="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 py-1 rounded-lg w-full text-center">
+                Ver {{ (p.items | length) - 3 }} ítem(s) adicionales ({{ p.items | length }} en total)
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="pt-2.5 flex flex-wrap gap-1.5 justify-end">
+            <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Editar</a>
+            <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Excel</a>
+            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+            <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
+                <button type="submit" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Notificar</button>
+            </form>
+            <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Confirmar eliminación de {{ p.po_codigo }}?');" class="inline m-0">
+                <button type="submit" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">Eliminar</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl p-8 text-center text-slate-400 text-sm border border-slate-200">
+        No se encontraron órdenes registradas con los criterios seleccionados.
+    </div>
+    {% endfor %}
+</div>
+
+<!-- VISTA ESCRITORIO -->
+<div class="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4">
+    <table class="w-full table-fixed divide-y divide-slate-200 text-xs">
+        <thead class="fly-bg text-white text-[11px] uppercase tracking-wider">
+            <tr class="divide-x divide-blue-900/40">
+                <th class="w-[16%] px-4 py-3 text-left">PO / Indicador</th>
+                <th class="w-[12%] px-4 py-3 text-left">Cliente</th>
+                <th class="w-[26%] px-4 py-3 text-left">Part Number, Proveedor y Estado</th>
+                <th class="w-[9%] px-4 py-3 text-center">Operación</th>
+                <th class="w-[11%] px-4 py-3 text-left">Asesor</th>
+                <th class="w-[9%] px-4 py-3 text-left">Fechas</th>
+                <th class="w-[8%] px-4 py-3 text-right">Total</th>
+                <th class="w-[9%] px-4 py-3 text-center">Acciones</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
             {% for p in pedidos %}
             {% set info = p.dias_habiles_info %}
-            <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3.5 whitespace-nowrap">
-                    <div class="flex items-center gap-2.5">
-                        <span class="font-extrabold text-[#002060] text-base">PO {{ p.po }}</span>
-                        <span class="whitespace-nowrap inline-block px-3 py-1 rounded-md text-xs font-extrabold shadow-sm
+            <tr class="hover:bg-slate-50/80 align-top divide-x divide-slate-100">
+                <td class="px-4 py-3 text-left break-words">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="font-extrabold text-[#002060] text-sm">{{ p.po_codigo }}</span>
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold
                             {% if info.color == 'emerald' %}bg-emerald-600 text-white
                             {% elif info.color == 'red' %}bg-red-600 text-white
                             {% else %}bg-slate-200 text-slate-700{% endif %}">
                             {{ info.etiqueta }}
                         </span>
                     </div>
-                    <div class="text-xs text-slate-500 mt-1">Inicio: {{ p.fecha_inicial }} &middot; Estado: <strong class="text-slate-700">{{ p.estado }}</strong></div>
+                    <div class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                        <div>Inicio: <strong>{{ p.fecha_inicial }}</strong></div>
+                        <div>Actualizado: <strong>{{ p.actualizado_en.strftime('%Y-%m-%d %H:%M') if p.actualizado_en else p.fecha_inicial }}</strong></div>
+                        <div>Estado: <strong class="text-slate-700">{{ p.estado }}</strong></div>
+                    </div>
                 </td>
-                <td class="px-4 py-3.5 font-bold text-slate-800 whitespace-nowrap">{{ p.cliente.nombre }}</td>
-                <td class="px-4 py-3.5 whitespace-nowrap">
-                    <span class="px-2.5 py-0.5 text-xs font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
+
+                <td class="px-4 py-3 text-left font-bold text-slate-800 break-words">
+                    {{ p.cliente.nombre }}
+                </td>
+
+                <td class="px-4 py-2.5 text-left">
+                    <div class="space-y-1.5">
+                        {% for it in p.items[:3] %}
+                        <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+                            <div class="truncate">
+                                <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
+                                <span class="text-slate-600">| {{ it.descripcion }}</span>
+                                <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
+                                {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
+                                {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
+                                {% else %}bg-amber-100 text-amber-800{% endif %}">
+                                {{ it.estado_producto or 'PENDIENTE' }}
+                            </span>
+                        </div>
+                        {% endfor %}
+
+                        {% if (p.items | length) > 3 %}
+                        <div id="items-extra-{{ p.id }}" class="hidden space-y-1.5 pt-1">
+                            {% for it in p.items[3:] %}
+                            <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+                                <div class="truncate">
+                                    <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
+                                    <span class="text-slate-600">| {{ it.descripcion }}</span>
+                                    <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
+                                    {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
+                                    {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
+                                    {% else %}bg-amber-100 text-amber-800{% endif %}">
+                                    {{ it.estado_producto or 'PENDIENTE' }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" onclick="toggleItemsPO({{ p.id }}, {{ (p.items | length) - 3 }})" id="btn-items-{{ p.id }}" class="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1 rounded-lg transition w-full text-center">
+                            Ver {{ (p.items | length) - 3 }} ítem(s) adicionales ({{ p.items | length }} en total)
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+
+                <td class="px-4 py-3 text-center break-words">
+                    <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
                         {{ p.tipo }}
                     </span>
-                    <div class="text-xs text-slate-500 mt-1">{{ p.metodo_pago or 'Por definir' }}</div>
+                    <div class="text-[11px] text-slate-500 mt-1 font-medium">{{ p.metodo_pago or 'Por definir' }}</div>
                 </td>
-                <td class="px-4 py-3.5 whitespace-nowrap">
-                    <div class="font-bold text-slate-800">{{ p.asesor.nombre }}</div>
-                    <div class="text-xs text-slate-500">{{ p.asesor.email or 'support1@eagleaeronauticalsupport.com' }}</div>
+
+                <td class="px-4 py-3 text-left break-words">
+                    <div class="font-bold text-slate-800 leading-tight">{{ p.asesor.nombre }}</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">{{ p.asesor.rol }}</div>
                 </td>
-                <td class="px-4 py-3.5 text-xs whitespace-nowrap">
-                    <div><span class="text-slate-400 font-semibold">Plazo:</span> <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
+
+                <td class="px-4 py-3 text-left text-[11px] break-words">
+                    <div><span class="text-slate-400 font-semibold">Prometido:</span> <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
                     {% if p.fecha_entrega_cliente %}
-                    <div class="text-emerald-700 font-bold mt-0.5">Entrega: {{ p.fecha_entrega_cliente }}</div>
+                    <div class="text-emerald-700 font-bold mt-0.5">Entregado: {{ p.fecha_entrega_cliente }}</div>
                     {% endif %}
                 </td>
-                <td class="px-4 py-3.5 text-right font-bold text-amber-700 whitespace-nowrap">
-                    {{ p.valor_nacionalizacion_dec | money }}
-                </td>
-                <td class="px-4 py-3.5 text-right font-extrabold text-slate-900 whitespace-nowrap">
+
+                <td class="px-4 py-3 text-right font-extrabold text-slate-900 text-xs break-words">
                     {{ p.total | money }}
+                    {% if p.tipo == 'Internacional' and p.valor_nacionalizacion_dec > 0 %}
+                    <span class="block text-[10px] font-semibold text-amber-700">Nac: {{ p.valor_nacionalizacion_dec | money }}</span>
+                    {% endif %}
                 </td>
-                <td class="px-4 py-3.5 text-right whitespace-nowrap space-x-1">
-                    <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
-                        <button type="submit" class="bg-amber-100 text-amber-800 hover:bg-amber-200 px-2.5 py-1.5 rounded-lg font-bold text-xs">✉ Correo</button>
-                    </form>
-                    <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Editar</a>
-                    <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Excel</a>
-                    {% if p.drive_link %}
-                    <a href="{{ p.drive_link }}" target="_blank" class="bg-sky-50 text-sky-700 hover:bg-sky-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">Drive</a>
-                    {% endif %}
-                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                    <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Eliminar la PO {{ p.po }}?');" class="inline m-0">
-                        <button type="submit" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold text-xs">✕</button>
-                    </form>
-                    {% endif %}
+
+                <td class="px-3 py-3 text-center">
+                    <div class="flex flex-wrap justify-center gap-1">
+                        <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded font-bold text-[11px]">Editar</a>
+                        <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded font-bold text-[11px]">Excel</a>
+                        {% if p.documentacion_archivo %}
+                        <a href="/pedidos/{{ p.id }}/documento" class="bg-purple-50 text-purple-700 hover:bg-purple-100 px-2 py-1 rounded font-bold text-[11px]">PDF</a>
+                        {% endif %}
+                        {% if p.drive_folder_link or p.drive_link %}
+                        <a href="{{ p.drive_folder_link or p.drive_link }}" target="_blank" class="bg-sky-50 text-sky-700 hover:bg-sky-100 px-2 py-1 rounded font-bold text-[11px]">Drive</a>
+                        {% endif %}
+                        {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                        <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
+                            <button type="submit" class="bg-amber-100 text-amber-800 hover:bg-amber-200 px-2 py-1 rounded font-bold text-[11px]" title="Notificar por correo">Correo</button>
+                        </form>
+                        <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Confirmar eliminación de {{ p.po_codigo }}?');" class="inline m-0">
+                            <button type="submit" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded font-bold text-[11px]" title="Eliminar orden">Borrar</button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="8" class="px-6 py-12 text-center text-slate-400">No hay órdenes de compra registradas con este filtro.</td>
+                <td colspan="8" class="px-6 py-10 text-center text-slate-400 text-sm">No se encontraron órdenes registradas con los criterios seleccionados.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+{% if total_paginas > 1 %}
+<div class="flex flex-wrap items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-200 gap-3">
+    <div class="text-xs text-slate-500 font-semibold">
+        Página <strong class="text-slate-800">{{ pagina_actual }}</strong> de <strong class="text-slate-800">{{ total_paginas }}</strong> ({{ total_pedidos }} órdenes en total)
+    </div>
+    <div class="flex items-center gap-1.5 flex-wrap">
+        {% if pagina_actual > 1 %}
+        <a href="/pedidos?page={{ pagina_actual - 1 }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
+            Anterior
+        </a>
+        {% endif %}
+
+        {% for p_num in range(1, total_paginas + 1) %}
+            {% if p_num == 1 or p_num == total_paginas or (p_num >= pagina_actual - 2 and p_num <= pagina_actual + 2) %}
+            <a href="/pedidos?page={{ p_num }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold transition {% if p_num == pagina_actual %}fly-bg text-white shadow{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
+                {{ p_num }}
+            </a>
+            {% elif p_num == pagina_actual - 3 or p_num == pagina_actual + 3 %}
+            <span class="px-2 text-slate-400">...</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if pagina_actual < total_paginas %}
+        <a href="/pedidos?page={{ pagina_actual + 1 }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
+            Siguiente
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+function toggleItemsPO(id, restantes) {
+    const bloque = document.getElementById('items-extra-' + id);
+    const btn = document.getElementById('btn-items-' + id);
+    if (!bloque || !btn) return;
+    if (bloque.classList.contains('hidden')) {
+        bloque.classList.remove('hidden');
+        btn.textContent = 'Ocultar ítems adicionales';
+    } else {
+        bloque.classList.add('hidden');
+        btn.textContent = `Ver ${restantes} ítem(s) adicionales`;
+    }
+}
+function toggleItemsMovil(id, restantes) {
+    const bloque = document.getElementById('items-extra-movil-' + id);
+    const btn = document.getElementById('btn-items-movil-' + id);
+    if (!bloque || !btn) return;
+    if (bloque.classList.contains('hidden')) {
+        bloque.classList.remove('hidden');
+        btn.textContent = 'Ocultar ítems adicionales';
+    } else {
+        bloque.classList.add('hidden');
+        btn.textContent = `Ver ${restantes} ítem(s) adicionales`;
+    }
+}
+</script>
 {% endblock %}

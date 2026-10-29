@@ -37,6 +37,7 @@ class Asesor(Base):
     username = Column(String(50), unique=True, nullable=True, index=True)
     password_hash = Column(String(300), nullable=True)
     email = Column(String(150), nullable=True)
+    telefono = Column(String(50), nullable=True)
 
     rol = Column(String(50), nullable=False, default="Asesor")
     jefe_id = Column(Integer, ForeignKey("asesores.id"), nullable=True)
@@ -79,10 +80,14 @@ class Pedido(Base):
     numero_remision = Column(String(50), nullable=True)
 
     documentacion = Column(String(500), nullable=True)
+    documentacion_archivo = Column(String(500), nullable=True)
+    documentacion_drive_link = Column(String(500), nullable=True)
+
     estado = Column(String(25), nullable=False, default="En proceso")
     observaciones = Column(Text, nullable=True)
 
     drive_link = Column(String(500), nullable=True)
+    drive_folder_link = Column(String(500), nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -92,6 +97,11 @@ class Pedido(Base):
                          cascade="all, delete-orphan", order_by="ItemPedido.id")
     internacional = relationship("PedidoInternacional", back_populates="pedido",
                                  uselist=False, cascade="all, delete-orphan")
+
+    @property
+    def po_codigo(self) -> str:
+        val = (self.po or "").strip()
+        return val if val.upper().startswith("PO") else f"PO-{val}"
 
     @property
     def subtotal(self) -> Decimal:
@@ -115,11 +125,13 @@ class Pedido(Base):
 
     @property
     def dias_habiles_info(self) -> dict:
+        etiqueta_po = self.po_codigo
         if not self.plazo_entrega:
             return {
                 "dias": None,
+                "orden_urgencia": 999999,
                 "en_contra": False,
-                "etiqueta": f"PO {self.po} · SIN PLAZO",
+                "etiqueta": f"{etiqueta_po} | SIN PLAZO",
                 "detalle": "Sin fecha límite",
                 "color": "slate"
             }
@@ -129,8 +141,9 @@ class Pedido(Base):
             palabra = "DÍA HÁBIL" if dias == 1 else "DÍAS HÁBILES"
             return {
                 "dias": dias,
+                "orden_urgencia": dias,
                 "en_contra": False,
-                "etiqueta": f"PO {self.po} · {dias} {palabra}",
+                "etiqueta": f"{etiqueta_po} | {dias} {palabra}",
                 "detalle": f"{dias} {palabra.lower()} a favor",
                 "color": "emerald"
             }
@@ -139,8 +152,9 @@ class Pedido(Base):
             palabra = "DÍA EN CONTRA" if dias_abs == 1 else "DÍAS EN CONTRA"
             return {
                 "dias": dias,
+                "orden_urgencia": dias,
                 "en_contra": True,
-                "etiqueta": f"PO {self.po} · {dias_abs} {palabra}",
+                "etiqueta": f"{etiqueta_po} | {dias_abs} {palabra}",
                 "detalle": f"{dias_abs} {palabra.lower()}",
                 "color": "red"
             }
@@ -162,6 +176,7 @@ class ItemPedido(Base):
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(14, 2), nullable=False)
     iva_porcentaje = Column(Numeric(5, 2), nullable=False, default=19)
+    estado_producto = Column(String(30), nullable=False, default="PENDIENTE")
 
     pedido = relationship("Pedido", back_populates="items")
 

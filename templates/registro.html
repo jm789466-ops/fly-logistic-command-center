@@ -1,65 +1,72 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-8 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-    <div class="fly-gradient px-8 py-5 text-white">
-        <h2 class="text-xl font-extrabold uppercase tracking-wider">Alta de Asesor Corporativo</h2>
-        <p class="text-xs text-sky-200 mt-1">Autorización mediante clave única de Arquitecto Maestro, Gerencia o Jefe de Área</p>
+<div class="max-w-lg mx-auto mt-4 sm:mt-8 bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+    <div class="fly-bg text-white p-5 sm:p-6 flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-base sm:text-lg font-extrabold uppercase tracking-wide text-white">Registro de Asesor Corporativo</h1>
+            <p class="text-xs text-sky-200 mt-1">Autorización validada por Administración, Gerencia o Jefatura de Área</p>
+        </div>
+        <div class="bg-white rounded-xl px-3 py-1.5 shrink-0 shadow">
+            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-8 sm:h-9 w-auto object-contain">
+        </div>
     </div>
 
-    <div class="p-8">
+    <form method="post" action="/registro" class="p-5 sm:p-6 space-y-4">
         {% if error %}
-        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-6 text-sm rounded">
+        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3 rounded-lg text-xs font-bold">
             {{ error }}
         </div>
         {% endif %}
 
-        <form method="post" action="/registro" class="space-y-4">
+        <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nombre y Apellido Completo</label>
+            <input type="text" name="nombre" value="{{ v.get('nombre', '') }}" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nombre y Apellido</label>
-                <input type="text" name="nombre" value="{{ v.get('nombre', '') }}" class="w-full px-3.5 py-2 border rounded-lg" required>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Usuario de Acceso</label>
-                    <input type="text" name="username" value="{{ v.get('username', '') }}" class="w-full px-3.5 py-2 border rounded-lg" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Correo Corporativo</label>
-                    <input type="email" name="email" value="{{ v.get('email', 'support1@eagleaeronauticalsupport.com') }}" class="w-full px-3.5 py-2 border rounded-lg" required>
-                </div>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Usuario de Acceso</label>
+                <input type="text" name="username" value="{{ v.get('username', '') }}" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
             </div>
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Asignado a Jefe de Área / Superior</label>
-                <select name="jefe_id" class="w-full px-3.5 py-2 border rounded-lg bg-white">
-                    <option value="">-- Seleccionar Superior Directo --</option>
-                    {% for sup in superiores %}
-                    <option value="{{ sup.id }}" {% if v.get('jefe_id') == (sup.id ~ '') %}selected{% endif %}>
-                        {{ sup.nombre }} ({{ sup.rol }})
-                    </option>
-                    {% endfor %}
-                </select>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Correo Corporativo</label>
+                <input type="email" name="email" value="{{ v.get('email', '') }}" placeholder="usuario@flylogistic.aero" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Contraseña (mín. 8)</label>
-                    <input type="password" name="password" class="w-full px-3.5 py-2 border rounded-lg" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Confirmar Contraseña</label>
-                    <input type="password" name="password2" class="w-full px-3.5 py-2 border rounded-lg" required>
-                </div>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Superior / Jefe de Área Asignado</label>
+            <select name="jefe_id" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-white font-semibold">
+                <option value="">Seleccionar Superior Directo</option>
+                {% for s in superiores %}
+                <option value="{{ s.id }}" {% if v.get('jefe_id') == (s.id ~ '') %}selected{% endif %}>{{ s.nombre }} ({{ s.rol }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Contraseña</label>
+                <input type="password" name="password" placeholder="Mínimo 8 caracteres" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm">
             </div>
-            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <label class="block text-xs font-bold uppercase text-[#002060] mb-1">Clave de Autorización Superior</label>
-                <input type="password" name="clave_maestra" class="w-full px-3.5 py-2 border rounded-lg bg-white" required>
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Confirmar Contraseña</label>
+                <input type="password" name="password2" placeholder="Repetir contraseña" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm">
             </div>
-            <button type="submit" class="w-full py-3 rounded-lg text-white font-bold fly-bg fly-hover transition uppercase text-sm tracking-wider">
-                Registrar Cuenta
-            </button>
-            <div class="text-center mt-3">
-                <a href="/login" class="text-xs text-blue-700 hover:underline">← Volver a Iniciar Sesión</a>
-            </div>
-        </form>
-    </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
+            <label class="block text-xs font-bold uppercase text-[#002060] mb-1">Clave de Autorización Directiva</label>
+            <input type="password" name="clave_maestra" placeholder="Ingrese la clave directiva (FLY01)" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-white">
+        </div>
+
+        <button type="submit" class="w-full fly-bg fly-hover text-white font-extrabold py-3 rounded-lg text-xs uppercase tracking-wider shadow transition">
+            Completar Registro Corporativo
+        </button>
+
+        <div class="text-center pt-2">
+            <a href="/login" class="text-xs font-bold text-blue-700 hover:underline">Volver al Inicio de Sesión</a>
+        </div>
+    </form>
 </div>
 {% endblock %}

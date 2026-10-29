@@ -1,19 +1,42 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-xl border border-slate-200">
-    <h2 class="text-xl font-extrabold fly-text uppercase text-center mb-6">Asignar Nueva Contraseña</h2>
-    {% if error %}
-    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-4 text-sm">{{ error }}</div>
-    {% endif %}
-    {% if valido %}
-    <form method="post" class="space-y-4">
-        <div><label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nueva Contraseña</label><input type="password" name="password" required autofocus class="w-full px-4 py-2.5 border rounded-lg"></div>
-        <div><label class="block text-xs font-bold uppercase text-slate-600 mb-1">Confirmar Contraseña</label><input type="password" name="password2" required class="w-full px-4 py-2.5 border rounded-lg"></div>
-        <button type="submit" class="w-full py-3 rounded-lg text-white font-bold fly-bg fly-hover text-sm uppercase">Guardar Contraseña</button>
-    </form>
-    {% else %}
-    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 mb-4 text-sm text-center">El enlace es inválido o ha expirado.</div>
-    <div class="text-center"><a href="/olvide" class="text-blue-700 font-bold text-sm hover:underline">Solicitar un nuevo enlace</a></div>
-    {% endif %}
+<div class="max-w-md mx-auto mt-6 sm:mt-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+    <div class="fly-bg px-6 sm:px-8 py-6 text-center text-white">
+        <div class="inline-flex items-center justify-center bg-white px-4 py-2 rounded-xl shadow mb-3">
+            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-10 w-auto object-contain">
+        </div>
+        <h2 class="text-lg font-extrabold uppercase tracking-wider text-white">Asignar Nueva Contraseña</h2>
+        <p class="text-xs text-sky-200 mt-0.5">Actualización de credenciales de acceso</p>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        {% if not valido %}
+        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 rounded-lg text-xs font-semibold mb-5">
+            El enlace de restablecimiento no es válido o ha expirado. Solicite uno nuevo.
+        </div>
+        <div class="text-center">
+            <a href="/olvide" class="inline-block fly-bg text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">Solicitar Nuevo Enlace</a>
+        </div>
+        {% else %}
+            {% if error %}
+            <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-5 text-xs font-semibold rounded">
+                {{ error }}
+            </div>
+            {% endif %}
+            <form method="post" action="" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Nueva Contraseña (Mín. 8 caracteres)</label>
+                    <input type="password" name="password" minlength="8" required autofocus class="w-full h-10 px-3.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Confirmar Nueva Contraseña</label>
+                    <input type="password" name="password2" minlength="8" required class="w-full h-10 px-3.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+                <button type="submit" class="w-full py-3 rounded-lg text-white font-extrabold fly-bg fly-hover transition uppercase text-xs tracking-wider shadow">
+                    Guardar Nueva Contraseña
+                </button>
+            </form>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

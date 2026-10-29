@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+    <div>
+        <h2 class="text-lg sm:text-xl font-extrabold fly-text">Supervisión y Reasignación de Cartera</h2>
+        <p class="text-xs text-slate-500">Control de órdenes asignadas por colaborador y transferencia de cartera</p>
+    </div>
+    <a href="/informes/productos_excel" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-2 whitespace-nowrap">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+        <span>Descargar Maestro de Productos</span>
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+    <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-[#002060]">
+        <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060] mb-3">Transferencia Masiva de Cartera</h3>
+        <form action="/supervision/reasignar" method="post" onsubmit="return confirm('¿Confirmar transferencia de todas las órdenes del asesor origen al asesor destino?');" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <input type="hidden" name="modo" value="masivo">
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Asesor Origen</label>
+                <select name="asesor_origen_id" required class="w-full h-9 border border-slate-300 px-3 rounded-lg text-xs bg-white font-semibold">
+                    <option value="">Seleccionar origen...</option>
+                    {% for a in asesores_lista %}
+                    <option value="{{ a.id }}">{{ a.nombre }} ({{ a.pedidos | length }} POs)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Nuevo Responsable</label>
+                <select name="nuevo_asesor_id" required class="w-full h-9 border border-slate-300 px-3 rounded-lg text-xs bg-white font-semibold">
+                    <option value="">Seleccionar destino...</option>
+                    {% for a in asesores_lista %}
+                    <option value="{{ a.id }}">{{ a.nombre }} ({{ a.rol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="fly-bg fly-hover text-white h-9 px-4 rounded-lg font-bold text-xs uppercase tracking-wider shadow-sm">
+                Transferir Cartera
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-sky-600">
+        <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060] mb-3">Filtro de Órdenes por Colaborador</h3>
+        <form method="get" action="/supervision" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Colaborador</label>
+                <select name="asesor_id" class="w-full h-9 border border-slate-300 px-3 rounded-lg text-xs bg-white">
+                    <option value="">Todos</option>
+                    {% for a in asesores_lista %}
+                    <option value="{{ a.id }}" {% if f_asesor == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Buscar PO o Cliente</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Número PO o Cliente..." class="w-full h-9 border border-slate-300 px-3 rounded-lg text-xs">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="fly-bg text-white h-9 px-4 rounded-lg font-bold text-xs flex-grow">Consultar</button>
+                <a href="/supervision" class="bg-slate-200 text-slate-700 h-9 px-3 rounded-lg font-bold text-xs flex items-center justify-center">Limpiar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+    {% for item in resumen_asesores %}
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+        <div>
+            <div class="flex justify-between items-start gap-2 mb-2">
+                <div>
+                    <h4 class="font-extrabold text-slate-900 text-sm">{{ item.asesor.nombre }}</h4>
+                    <span class="text-[11px] text-slate-500 font-medium">{{ item.asesor.rol }}</span>
+                </div>
+                <span class="bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0">
+                    {{ item.total_pos }} POs ({{ item.pos_activas }} activas)
+                </span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 mt-2">
+                {% for p in item.pedidos[:8] %}
+                <a href="/pedidos/{{ p.id }}/editar" class="text-[10px] px-2 py-0.5 rounded font-bold border
+                    {% if p.dias_habiles_info.color == 'red' %}bg-red-50 text-red-700 border-red-200
+                    {% elif p.dias_habiles_info.color == 'emerald' %}bg-emerald-50 text-emerald-700 border-emerald-200
+                    {% else %}bg-slate-100 text-slate-700 border-slate-200{% endif %}">
+                    {{ p.po_codigo }}
+                </a>
+                {% else %}
+                <span class="text-xs text-slate-400">Sin órdenes asignadas actualmente.</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+            <a href="/pedidos?asesor_id={{ item.asesor.id }}" class="text-xs font-bold text-blue-700 hover:underline">Ver cartera detallada</a>
+            <a href="/pedidos/consolidado/excel?asesor_id={{ item.asesor.id }}" class="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-md hover:bg-emerald-100 inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                <span>Consolidado Excel</span>
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- VISTA MÓVIL SUPERVISIÓN -->
+<div class="lg:hidden space-y-3">
+    {% for p in pedidos_supervision %}
+    {% set info = p.dias_habiles_info %}
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-2.5">
+        <div class="flex justify-between items-start">
+            <div>
+                <a href="/pedidos/{{ p.id }}/editar" class="font-extrabold text-[#002060] text-sm hover:underline">{{ p.po_codigo }}</a>
+                <div class="text-xs font-bold text-slate-700">{{ p.cliente.nombre }}</div>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded {% if info.color == 'red' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}">
+                {{ info.etiqueta }}
+            </span>
+        </div>
+        <div class="text-xs text-slate-600 flex justify-between">
+            <span>Operación: <strong>{{ p.tipo }}</strong> ({{ p.estado }})</span>
+            <span>Actual: <strong>{{ p.asesor.nombre }}</strong></span>
+        </div>
+        <form action="/supervision/reasignar" method="post" class="flex items-center gap-2 pt-2 border-t border-slate-100 m-0">
+            <input type="hidden" name="modo" value="individual">
+            <input type="hidden" name="pedido_id" value="{{ p.id }}">
+            <select name="nuevo_asesor_id" class="flex-1 h-9 border border-slate-300 px-2.5 rounded-lg text-xs bg-white font-semibold">
+                {% for a in asesores_lista %}
+                <option value="{{ a.id }}" {% if p.asesor_id == a.id %}selected{% endif %}>{{ a.nombre }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs">Reasignar</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- VISTA ESCRITORIO SUPERVISIÓN -->
+<div class="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="fly-bg text-white px-5 py-3 flex justify-between items-center">
+        <h3 class="font-bold text-xs uppercase tracking-wider">Reasignación Individual de Órdenes</h3>
+    </div>
+    <table class="w-full table-fixed divide-y divide-slate-200 text-xs">
+        <thead class="bg-slate-100 text-[11px] uppercase text-slate-600">
+            <tr class="divide-x divide-slate-200">
+                <th class="w-[16%] px-4 py-3 text-left">PO / Indicador</th>
+                <th class="w-[16%] px-4 py-3 text-left">Cliente</th>
+                <th class="w-[10%] px-4 py-3 text-center">Operación</th>
+                <th class="w-[10%] px-4 py-3 text-center">Estado</th>
+                <th class="w-[18%] px-4 py-3 text-left">Responsable Actual</th>
+                <th class="w-[30%] px-4 py-3 text-left">Transferir a</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            {% for p in pedidos_supervision %}
+            {% set info = p.dias_habiles_info %}
+            <tr class="hover:bg-slate-50 divide-x divide-slate-100 align-middle">
+                <td class="px-4 py-3 font-extrabold text-[#002060] break-words">
+                    <a href="/pedidos/{{ p.id }}/editar" class="hover:underline">{{ p.po_codigo }}</a>
+                    <span class="block text-[10px] font-bold mt-0.5 {% if info.color == 'red' %}text-red-600{% else %}text-emerald-600{% endif %}">{{ info.etiqueta }}</span>
+                </td>
+                <td class="px-4 py-3 font-semibold text-slate-800 break-words">{{ p.cliente.nombre }}</td>
+                <td class="px-4 py-3 text-center">{{ p.tipo }}</td>
+                <td class="px-4 py-3 text-center font-bold">{{ p.estado }}</td>
+                <td class="px-4 py-3 font-bold text-slate-800 break-words">{{ p.asesor.nombre }}</td>
+                <td class="px-4 py-3">
+                    <form action="/supervision/reasignar" method="post" class="flex items-center gap-2 m-0 w-full">
+                        <input type="hidden" name="modo" value="individual">
+                        <input type="hidden" name="pedido_id" value="{{ p.id }}">
+                        <select name="nuevo_asesor_id" class="w-[65%] h-9 border border-slate-300 px-2.5 rounded-lg text-xs bg-white font-semibold truncate">
+                            {% for a in asesores_lista %}
+                            <option value="{{ a.id }}" {% if p.asesor_id == a.id %}selected{% endif %}>{{ a.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="w-[33%] h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm">Reasignar</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-slate-400">No hay órdenes registradas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
