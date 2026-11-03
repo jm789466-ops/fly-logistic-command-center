@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from database import SessionLocal, engine, Base, BASE_DIR
 import models
 from main import (
-    parsear, aplicar, ruta_excel, hash_clave,
+    parsear, aplicar, ruta_excel, hash_clave, migrar_bd,
     generar_excel_com_fm_08,
     generar_excel_consolidado_usuario,
     generar_excel_maestro_productos
@@ -65,6 +65,7 @@ def guardar_o_reemplazar_po(db, datos_orden: dict, asesor_id: int):
 
 def ejecutar_qa_completo():
     Base.metadata.create_all(bind=engine)
+    migrar_bd()
     db = SessionLocal()
 
     try:
@@ -109,7 +110,7 @@ def ejecutar_qa_completo():
                 "iva_porcentaje": "19",
                 "valor_nacionalizacion": "0.00",
                 "estado_general": "En proceso",
-                "observaciones": "Orden inicial registrada con ítem pendiente de despacho.",
+                "observaciones": "Orden inicial registrada con ítem pendiente de despacho y cobro certificado.",
                 "items": [{
                     "fecha_compra_prov": "",
                     "proveedor": "Distribuidora Aeronáutica Bogotá",
@@ -119,6 +120,9 @@ def ejecutar_qa_completo():
                     "descripcion": "Válvula de alivio de presión de cabina",
                     "cantidad": "2",
                     "precio_unitario": "950.00",
+                    "cobro_hazmat": "0.00",
+                    "cobro_certificado": "120.00",
+                    "sin_iva": "0",
                     "iva_item": "19",
                     "estado_producto": "PENDIENTE"
                 }]
@@ -133,7 +137,7 @@ def ejecutar_qa_completo():
                 "iva_porcentaje": "19",
                 "valor_nacionalizacion": "0.00",
                 "estado_general": "En proceso",
-                "observaciones": "Orden en curso con compra efectuada a proveedor.",
+                "observaciones": "Orden en curso con compra efectuada a proveedor e ítem exento de IVA.",
                 "items": [
                     {
                         "fecha_compra_prov": hoy_str,
@@ -144,6 +148,9 @@ def ejecutar_qa_completo():
                         "descripcion": "Actuador hidráulico de tren principal",
                         "cantidad": "1",
                         "precio_unitario": "2200.00",
+                        "cobro_hazmat": "150.00",
+                        "cobro_certificado": "80.00",
+                        "sin_iva": "0",
                         "iva_item": "19",
                         "estado_producto": "DESPACHADO"
                     },
@@ -153,10 +160,13 @@ def ejecutar_qa_completo():
                         "parte_numero": "PN-EGT-102",
                         "parte_numero_alterno": "",
                         "unidad_medida": "EA",
-                        "descripcion": "Sensor de temperatura de gases de escape EGT",
+                        "descripcion": "Sensor de temperatura de gases de escape EGT (Exento)",
                         "cantidad": "2",
                         "precio_unitario": "500.00",
-                        "iva_item": "19",
+                        "cobro_hazmat": "0.00",
+                        "cobro_certificado": "0.00",
+                        "sin_iva": "1",
+                        "iva_item": "0",
                         "estado_producto": "EN FLY"
                     }
                 ]
@@ -184,6 +194,9 @@ def ejecutar_qa_completo():
                     "descripcion": "Unidad de control de combustible FCU",
                     "cantidad": "1",
                     "precio_unitario": "2500.00",
+                    "cobro_hazmat": "0.00",
+                    "cobro_certificado": "95.00",
+                    "sin_iva": "0",
                     "iva_item": "19",
                     "estado_producto": "ENTREGADO"
                 }]
@@ -203,7 +216,7 @@ def ejecutar_qa_completo():
                 "tracking": "1Z999AA10123456784",
                 "estado_nacionalizacion": "Pago de aranceles",
                 "fecha_nacionaliza": "",
-                "observaciones": "Importación en proceso de liquidación arancelaria.",
+                "observaciones": "Importación en proceso de liquidación arancelaria con cargo Hazmat.",
                 "items": [{
                     "fecha_compra_prov": (hoy - timedelta(days=10)).strftime("%Y-%m-%d"),
                     "proveedor": "Miami Aero Parts Inc.",
@@ -213,6 +226,9 @@ def ejecutar_qa_completo():
                     "descripcion": "Juego de sellos de turbina CFM56",
                     "cantidad": "1",
                     "precio_unitario": "6238.32",
+                    "cobro_hazmat": "210.00",
+                    "cobro_certificado": "125.00",
+                    "sin_iva": "0",
                     "iva_item": "7",
                     "estado_producto": "LLEGADO FLY"
                 }]
@@ -245,6 +261,9 @@ def ejecutar_qa_completo():
                     "descripcion": "Bomba de combustible de alta presión",
                     "cantidad": "1",
                     "precio_unitario": "9500.00",
+                    "cobro_hazmat": "320.00",
+                    "cobro_certificado": "150.00",
+                    "sin_iva": "0",
                     "iva_item": "7",
                     "estado_producto": "ENTREGADO"
                 }]
@@ -270,6 +289,7 @@ def ejecutar_qa_completo():
             items_generados = []
             for idx in range(1, cant_items + 1):
                 est_item = "ENTREGADO" if estado_po == "Entregado" else estados_prod_ciclo[(idx - 1) % len(estados_prod_ciclo)]
+                es_exento_prueba = (idx % 5 == 0)
                 items_generados.append({
                     "fecha_compra_prov": hoy_str if est_item != "PENDIENTE" else "",
                     "proveedor": f"AeroSupplier Global #{idx}",
@@ -279,7 +299,10 @@ def ejecutar_qa_completo():
                     "descripcion": f"Componente aeronáutico certificado línea #{idx}",
                     "cantidad": str((idx % 4) + 1),
                     "precio_unitario": f"{125.50 * idx:.2f}",
-                    "iva_item": imp_def,
+                    "cobro_hazmat": f"{35.00 if idx % 3 == 0 else 0.00:.2f}",
+                    "cobro_certificado": f"{25.00 if idx % 2 == 0 else 0.00:.2f}",
+                    "sin_iva": "1" if es_exento_prueba else "0",
+                    "iva_item": "0" if es_exento_prueba else imp_def,
                     "estado_producto": est_item
                 })
 
@@ -313,14 +336,15 @@ def ejecutar_qa_completo():
 
         for integrante in (admin, leonardo, miguel, carlos):
             pedidos_usr = db.query(models.Pedido).filter_by(asesor_id=integrante.id).all()
-            ruta_cons = os.path.join(BASE_DIR, "Consolidados_Usuarios", f"Consolidado_POs_{integrante.username}.xlsx")
+            nombre_limpio = integrante.nombre.replace(" ", "_")
+            ruta_cons = os.path.join(BASE_DIR, "Consolidados_Usuarios", f"Consolidado_POs_{nombre_limpio}.xlsx")
             generar_excel_consolidado_usuario(ruta_cons, pedidos_usr, integrante.nombre)
 
         todos_pedidos = db.query(models.Pedido).all()
         ruta_maestro = os.path.join(BASE_DIR, "Reportes_Gerenciales", "Control_Maestro_Productos_PO_FlyLogistic.xlsx")
         generar_excel_maestro_productos(ruta_maestro, todos_pedidos)
 
-        print("OK - Base de datos y reportes actualizados correctamente.")
+        print("OK - Base de datos, cobros Hazmat/Certificados, IVA Exento y los 4 reportes actualizados correctamente.")
 
     except Exception as e:
         db.rollback()

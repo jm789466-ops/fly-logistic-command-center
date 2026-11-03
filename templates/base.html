@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fly Logistic S.A.S. | Gestión de Órdenes (OMS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,6 +15,7 @@
         .fly-gradient { background: linear-gradient(135deg, #002060 0%, #001238 100%); }
         .fly-hover:hover { background-color: #001540; }
         .fly-text { color: #002060; }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
@@ -26,21 +28,17 @@
                 </div>
                 <div class="leading-tight">
                     <span class="font-extrabold text-sm sm:text-base tracking-tight block">FLY LOGISTIC S.A.S.</span>
-                    <span class="text-[10px] text-sky-300 uppercase tracking-widest block font-semibold">Gestión de Órdenes</span>
+                    <span class="text-[10px] text-sky-300 uppercase tracking-widest block font-semibold">Plataforma de Gestión Logística</span>
                 </div>
             </a>
 
+            <!-- Navegación superior limpia (Sin botones de Excel ni Nueva Orden duplicados) -->
             <nav class="hidden xl:flex items-center gap-1.5 text-xs font-semibold">
                 <a href="/pedidos" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Órdenes de Compra</a>
-                <a href="/pedidos/nuevo" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Nueva Orden</a>
-                <a href="/pedidos/consolidado/excel" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-                    <span>Consolidado Excel</span>
-                </a>
                 {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
                 <a href="/supervision" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Supervisión de Cartera</a>
-                <a href="/informes" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Indicadores</a>
-                <a href="/gestion_usuarios" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Usuarios</a>
+                <a href="/informes" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Indicadores Gerenciales</a>
+                <a href="/gestion_usuarios" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Gestión de Usuarios</a>
                 {% endif %}
             </nav>
 
@@ -49,7 +47,7 @@
                     <span class="font-semibold truncate max-w-[170px]">{{ user.nombre }}</span>
                     <span class="bg-sky-400 text-[#002060] px-2 py-0.5 rounded text-[10px] font-extrabold uppercase">{{ user.rol }}</span>
                 </a>
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">Salir</a>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">Cerrar Sesión</a>
             </div>
 
             <button type="button" onclick="document.getElementById('menu-movil').classList.toggle('hidden')" class="xl:hidden bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white focus:outline-none" aria-label="Menú">
@@ -66,12 +64,8 @@
             </div>
             <a href="/pedidos" class="block px-3 py-2 rounded-lg hover:bg-white/10">Órdenes de Compra</a>
             <a href="/pedidos/nuevo" class="block px-3 py-2 rounded-lg hover:bg-white/10">Registrar Nueva Orden</a>
-            <a href="/pedidos/consolidado/excel" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold">
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-                <span>Descargar Consolidado Excel</span>
-            </a>
             {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-            <a href="/supervision" class="block px-3 py-2 rounded-lg hover:bg-white/10">Supervisión y Reasignación</a>
+            <a href="/supervision" class="block px-3 py-2 rounded-lg hover:bg-white/10">Supervisión de Cartera</a>
             <a href="/informes" class="block px-3 py-2 rounded-lg hover:bg-white/10">Indicadores Gerenciales</a>
             <a href="/gestion_usuarios" class="block px-3 py-2 rounded-lg hover:bg-white/10">Gestión de Usuarios</a>
             {% endif %}

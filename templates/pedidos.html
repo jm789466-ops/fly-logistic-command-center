@@ -1,33 +1,164 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4">
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4"
+     x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false }">
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-4 border-b border-slate-200">
         <div>
-            <h2 class="text-lg sm:text-xl font-extrabold fly-text">Control de Órdenes de Compra (PO)</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-extrabold fly-text">Control de Órdenes de Compra (PO)</h2>
+                {% if asesor_f == (user.id ~ '') %}
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-[#002060] uppercase">
+                    Vista Activa: Mi Cartera Propia
+                </span>
+                {% elif asesor_f == 'todos' %}
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 uppercase">
+                    Vista Activa: Todos los Asesores
+                </span>
+                {% endif %}
+            </div>
             <p class="text-xs text-slate-500">Listado operativo ordenado por prioridad de entrega (15 registros por página)</p>
         </div>
+
         <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-            <a href="/pedidos/consolidado/excel{% if asesor_f %}?asesor_id={{ asesor_f }}{% endif %}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-                <span>Consolidado POs</span>
-            </a>
-            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-            <a href="/informes/productos_excel" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-                <span>Maestro de Ítems</span>
-            </a>
-            <form action="/pedidos/notificar_proximos" method="post" class="m-0 col-span-2 sm:col-auto">
-                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    <span>Notificar Pendientes</span>
+
+            <div class="relative col-span-2 sm:col-auto">
+                <button type="button"
+                        @click="menuExcel = !menuExcel; menuCorreos = false"
+                        @click.outside="menuExcel = false"
+                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-extrabold text-xs shadow-sm transition inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
+                    <span>Centro de Reportes Excel ▾</span>
                 </button>
-            </form>
+
+                <div x-show="menuExcel" x-cloak x-transition
+                     class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
+                    <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">DESCARGA DE REPORTES ESTRUCTURADOS</span>
+                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#002060]">Rol: {{ user.rol }}</span>
+                    </div>
+
+                    <!-- 1. Consolidado de Cartera Operativa por Usuario (Toma el valor actual del select asesor_id) -->
+                    <a :href="`/pedidos/consolidado/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                       class="block px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 transition">
+                        <div class="font-extrabold text-emerald-700 text-xs flex items-center justify-between">
+                            <span> Consolidado de Cartera Operativa</span>
+                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLSX</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            Pestañas Nacional (COP) e Internacional (USD) según el colaborador o vista seleccionada.
+                        </p>
+                    </a>
+
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                    <!-- 2. Control Maestro Global de Productos e Ítems -->
+                    <a :href="`/informes/productos_excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                       class="block px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-100 transition">
+                        <div class="font-extrabold text-indigo-700 text-xs flex items-center justify-between">
+                            <span> Control Maestro de Productos</span>
+                            <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">XLSX</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            Trazabilidad por SKU, proveedor, compra (SÍ / FALTA COMPRAR) y estado físico.
+                        </p>
+                    </a>
+
+                    <!-- 3. Informe Gerencial de Desempeño e Indicadores -->
+                    <a :href="`/informes/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                       class="block px-4 py-2.5 hover:bg-blue-50 transition">
+                        <div class="font-extrabold text-[#002060] text-xs flex items-center justify-between">
+                            <span> Informe Gerencial e Indicadores</span>
+                            <span class="text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded">XLSX</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            Métricas de asesores (SLA %), semáforo de POs y resumen de faltantes.
+                        </p>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ======================================================================= -->
+            <!-- SELECTOR DE CORREOS (INDIVIDUAL POR PO / CONSOLIDADO DE FALTANTES)      -->
+            <!-- ======================================================================= -->
+            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+            <div class="relative col-span-2 sm:col-auto">
+                <button type="button"
+                        @click="menuCorreos = !menuCorreos; menuExcel = false"
+                        @click.outside="menuCorreos = false"
+                        class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-lg font-extrabold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>Selector de Correos ▾</span>
+                </button>
+
+                <div x-show="menuCorreos" x-cloak x-transition
+                     class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
+                    <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Centro de Notificaciones SMTP</span>
+                    </div>
+
+                    <!-- Opción A: Notificación Individual por PO -->
+                    <button type="button"
+                            @click="modalCorreoIndividual = true; menuCorreos = false"
+                            class="w-full text-left px-4 py-2.5 hover:bg-amber-50 border-b border-slate-100 transition">
+                        <span class="font-extrabold text-slate-800 block text-xs">✉️ Notificación Individual por PO</span>
+                        <span class="text-[11px] text-slate-500">Seleccionar una Orden de Compra específica para enviar alerta</span>
+                    </button>
+
+                    <!-- Opción B: Notificar Todas las POs Activas del Equipo -->
+                    <form action="/pedidos/notificar_proximos" method="post" class="m-0 border-b border-slate-100">
+                        <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition">
+                            <span class="font-extrabold text-[#002060] block text-xs">📬 Seguimiento Masivo de POs Activas</span>
+                            <span class="text-[11px] text-slate-500">Notificar estado de plazo a los asesores responsables</span>
+                        </button>
+                    </form>
+
+                    <!-- Opción C: Reporte Consolidado de Faltantes (Restringido a Gerencia y Administradores) -->
+                    {% if user.rol in ['Administrador', 'Gerencia'] %}
+                    <form action="/pedidos/notificar_faltantes" method="post" class="m-0">
+                        <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-red-50 transition">
+                            <span class="font-extrabold text-red-700 block text-xs">🚨 Reporte Consolidado de Faltantes</span>
+                            <span class="text-[11px] text-slate-500">Exclusivo Gerencia/Admin: Resumen global de compras pendientes</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
             {% endif %}
+
             <a href="/pedidos/nuevo" class="col-span-2 sm:col-auto fly-bg fly-hover text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                 <span>+ Nueva Orden</span>
             </a>
         </div>
     </div>
+
+    <!-- Modal para seleccionar PO en "Notificación Individual por PO" -->
+    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+    <div x-show="modalCorreoIndividual" x-cloak
+         class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div @click.outside="modalCorreoIndividual = false"
+             class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+                <h3 class="text-sm font-extrabold text-[#002060] uppercase">Notificación Individual por PO</h3>
+                <button type="button" @click="modalCorreoIndividual = false" class="text-slate-400 hover:text-slate-700 font-bold text-sm">✕</button>
+            </div>
+            <form action="/pedidos/selector_correos" method="post" class="space-y-4">
+                <input type="hidden" name="tipo_correo" value="individual_po">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Seleccione la Orden de Compra a notificar:</label>
+                    <select name="pedido_id" required class="w-full h-10 border border-slate-300 rounded-lg px-3 text-xs font-semibold bg-white">
+                        {% for p_sel in todos_pedidos %}
+                        <option value="{{ p_sel.id }}">{{ p_sel.po_codigo }} — {{ p_sel.cliente.nombre }} ({{ p_sel.asesor.nombre }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="modalCorreoIndividual = false" class="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-xs font-bold">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg fly-bg text-white text-xs font-extrabold">Enviar Notificación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 
     {% if todos_pedidos %}
     {% set ns = namespace(en_contra=0, a_favor=0, entregadas=0) %}
@@ -109,11 +240,14 @@
         </div>
         {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
         <div class="lg:col-span-2">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Asesor Asignado</label>
-            <select name="asesor_id" class="w-full h-9 px-2.5 border border-slate-300 rounded-lg text-xs bg-white">
-                <option value="">Todos los Asesores</option>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Vista Cartera / Asesor</label>
+            <select name="asesor_id" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
+                <option value="{{ user.id }}" {% if asesor_f == (user.id ~ '') %}selected{% endif %}>Mi Cartera Propia ({{ user.nombre }})</option>
+                <option value="todos" {% if asesor_f == 'todos' %}selected{% endif %}>Todos los Asesores (Global)</option>
                 {% for a in asesores_disponibles %}
-                <option value="{{ a.id }}" {% if asesor_f == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }}</option>
+                    {% if a.id != user.id %}
+                    <option value="{{ a.id }}" {% if asesor_f == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
+                    {% endif %}
                 {% endfor %}
             </select>
         </div>
@@ -146,7 +280,7 @@
         </div>
         <div class="lg:col-span-1 flex gap-1.5">
             <button type="submit" class="fly-bg fly-hover text-white h-9 px-3 rounded-lg text-xs font-bold flex-grow">Filtrar</button>
-            <a href="/pedidos" class="bg-slate-200 hover:bg-slate-300 text-slate-700 h-9 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center" title="Limpiar">Limpiar</a>
+            <a href="/pedidos" class="bg-slate-200 hover:bg-slate-300 text-slate-700 h-9 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center" title="Volver a Mi Cartera Propia">Limpiar</a>
         </div>
     </form>
 </div>
@@ -170,9 +304,9 @@
                 <div class="text-xs font-bold text-slate-800 mt-1">{{ p.cliente.nombre }}</div>
             </div>
             <div class="text-right shrink-0">
-                <div class="font-extrabold text-slate-900 text-sm">{{ p.total | money }}</div>
+                <div class="font-extrabold text-slate-900 text-sm">{{ p.total | money }} <span class="text-[10px] text-slate-500">{{ p.moneda }}</span></div>
                 <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
-                    {{ p.tipo }} | {{ p.estado }}
+                    {{ p.tipo }} ({{ p.moneda }}) | {{ p.estado }}
                 </span>
             </div>
         </div>
@@ -224,7 +358,7 @@
 
         <div class="pt-2.5 flex flex-wrap gap-1.5 justify-end">
             <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Editar</a>
-            <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Excel</a>
+            <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs" title="Descargar Formato Operativo Individual FM-08">FM-08 Excel</a>
             {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
             <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
                 <button type="submit" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Notificar</button>
@@ -290,6 +424,9 @@
                                 <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
                                 <span class="text-slate-600">| {{ it.descripcion }}</span>
                                 <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
+                                {% if it.es_exento_iva %}
+                                <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
+                                {% endif %}
                             </div>
                             <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
                                 {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
@@ -308,6 +445,9 @@
                                     <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
                                     <span class="text-slate-600">| {{ it.descripcion }}</span>
                                     <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
+                                    {% if it.es_exento_iva %}
+                                    <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
+                                    {% endif %}
                                 </div>
                                 <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
                                     {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
@@ -327,7 +467,7 @@
 
                 <td class="px-4 py-3 text-center break-words">
                     <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
-                        {{ p.tipo }}
+                        {{ p.tipo }} ({{ p.moneda }})
                     </span>
                     <div class="text-[11px] text-slate-500 mt-1 font-medium">{{ p.metodo_pago or 'Por definir' }}</div>
                 </td>
@@ -345,7 +485,7 @@
                 </td>
 
                 <td class="px-4 py-3 text-right font-extrabold text-slate-900 text-xs break-words">
-                    {{ p.total | money }}
+                    {{ p.total | money }} <span class="text-[10px] text-slate-500">{{ p.moneda }}</span>
                     {% if p.tipo == 'Internacional' and p.valor_nacionalizacion_dec > 0 %}
                     <span class="block text-[10px] font-semibold text-amber-700">Nac: {{ p.valor_nacionalizacion_dec | money }}</span>
                     {% endif %}
@@ -354,8 +494,12 @@
                 <td class="px-3 py-3 text-center">
                     <div class="flex flex-wrap justify-center gap-1">
                         <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded font-bold text-[11px]">Editar</a>
-                        <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded font-bold text-[11px]">Excel</a>
-                        {% if p.documentacion_archivo %}
+                        <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded font-bold text-[11px]" title="Descargar Formato Operativo Individual FM-08">Excel</a>
+                        {% if p.lista_documentos %}
+                        <a href="/pedidos/{{ p.id }}/documento" class="bg-purple-50 text-purple-700 hover:bg-purple-100 px-2 py-1 rounded font-bold text-[11px]" title="{{ p.lista_documentos | length }} documento(s) adjunto(s)">
+                            Docs ({{ p.lista_documentos | length }})
+                        </a>
+                        {% elif p.documentacion_archivo %}
                         <a href="/pedidos/{{ p.id }}/documento" class="bg-purple-50 text-purple-700 hover:bg-purple-100 px-2 py-1 rounded font-bold text-[11px]">PDF</a>
                         {% endif %}
                         {% if p.drive_folder_link or p.drive_link %}

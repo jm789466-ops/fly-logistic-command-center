@@ -6,14 +6,19 @@
             <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060]">
                 {% if modo == 'nuevo' %}Registro de Nueva Orden de Compra (PO){% else %}Edición de Orden de Compra · {{ pedido.po_codigo }}{% endif %}
             </h1>
-            <p class="text-xs text-slate-500 mt-0.5">Complete los datos operativos de la orden y el detalle de ítems.</p>
+            <p class="text-xs text-slate-500 mt-0.5">Complete los datos operativos de la orden, cobros adicionales (Hazmat/Certificados), régimen de IVA y soportes adjuntos.</p>
         </div>
-        {% if modo == 'nuevo' and siguiente_po_sugerida %}
-        <div class="bg-blue-50 border border-blue-200 px-3.5 py-2 rounded-xl text-xs">
-            <span class="text-slate-500 font-semibold">Consecutivo sugerido:</span>
-            <strong class="text-blue-800 ml-1">{{ siguiente_po_sugerida }}</strong>
+        <div class="flex flex-wrap items-center gap-2">
+            <span id="badge-moneda-activa" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                Moneda Activa: COP ($)
+            </span>
+            {% if modo == 'nuevo' and siguiente_po_sugerida %}
+            <div class="bg-blue-50 border border-blue-200 px-3.5 py-2 rounded-xl text-xs">
+                <span class="text-slate-500 font-semibold">Consecutivo sugerido:</span>
+                <strong class="text-blue-800 ml-1">{{ siguiente_po_sugerida }}</strong>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
     {% if error %}
@@ -53,20 +58,21 @@
                     {% endif %}
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Tipo de Operación:</label>
-                    <select name="tipo_pedido" id="tipo_pedido" onchange="cambiarTipoPedido(true)" class="w-full h-10 border-2 border-blue-600 px-3 rounded-lg text-sm font-bold text-[#002060] bg-white" {% if modo == 'editar' %}readonly style="pointer-events: none;"{% endif %}>
-                        <option value="Nacional" {% if d.get('tipo_pedido') == 'Nacional' %}selected{% endif %}>Operación Nacional (IVA 19%)</option>
-                        <option value="Internacional" {% if d.get('tipo_pedido') == 'Internacional' %}selected{% endif %}>Operación Internacional (TAX 7%)</option>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Tipo de Operación (Habilitado para cambio Nacional / Internacional):</label>
+                    <select name="tipo_pedido" id="tipo_pedido" onchange="cambiarTipoPedido(true)" class="w-full h-10 border-2 border-blue-600 px-3 rounded-lg text-sm font-bold text-[#002060] bg-white cursor-pointer">
+                        <option value="Nacional" {% if d.get('tipo_pedido') == 'Nacional' %}selected{% endif %}>Operación Nacional (Moneda COP · IVA 19%)</option>
+                        <option value="Internacional" {% if d.get('tipo_pedido') == 'Internacional' %}selected{% endif %}>Operación Internacional (Moneda USD · TAX 7%)</option>
                     </select>
                 </div>
             </div>
         </div>
 
         <div class="mb-7">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">2. Detalles de los Productos y Estados</h2>
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">2. Detalles de los Productos, Cobros Adicionales (Hazmat / Certificados) y Estados</h2>
             <div id="items-container" class="space-y-4 mb-4">
-                {% set lista_items = d.get('items') if d.get('items') else [{'fecha_compra_prov': '', 'proveedor': '', 'parte_numero': '', 'parte_numero_alterno': '', 'unidad_medida': 'UND', 'descripcion': '', 'cantidad': '1', 'precio_unitario': '', 'iva_item': '19', 'estado_producto': 'PENDIENTE'}] %}
+                {% set lista_items = d.get('items') if d.get('items') else [{'fecha_compra_prov': '', 'proveedor': '', 'parte_numero': '', 'parte_numero_alterno': '', 'unidad_medida': 'UND', 'descripcion': '', 'cantidad': '1', 'precio_unitario': '', 'cobro_hazmat': '0.00', 'cobro_certificado': '0.00', 'sin_iva': '0', 'iva_item': '19', 'estado_producto': 'PENDIENTE'}] %}
                 {% for item in lista_items %}
+                {% set item_es_exento = (item.get('sin_iva') | string == '1') or (item.get('iva_item') | string in ['0', '0.0', '0.00']) %}
                 <div class="item-row relative bg-slate-50 border border-slate-200 border-l-4 border-l-[#002060] rounded-xl p-4 shadow-sm">
                     <button type="button" onclick="eliminarItem(this)" class="absolute top-3 right-3 bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-[10px] font-bold" title="Quitar ítem">Quitar</button>
 
@@ -112,22 +118,37 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 items-end">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">Cantidad:</label>
                             <input type="number" name="cantidad" value="{{ item.get('cantidad', '1') }}" min="1" oninput="recalcularTotales()" class="item-cant w-full h-9 border border-slate-300 px-3 rounded-lg text-xs bg-white font-bold" required>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Precio unitario ($):</label>
+                            <label class="label-precio-unit block text-xs font-bold text-slate-700 mb-1">Precio Unit. (COP):</label>
                             <input type="number" step="0.01" min="0.01" name="precio_unitario" value="{{ item.get('precio_unitario', '') }}" oninput="recalcularTotales()" class="item-precio w-full h-9 border border-slate-300 px-3 rounded-lg text-xs bg-white font-bold" required>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-blue-700 mb-1">Impuesto Ítem (%):</label>
-                            <input type="number" step="0.01" min="0" max="100" name="iva_item" value="{{ item.get('iva_item', d.get('iva_porcentaje', '19')) }}" oninput="recalcularTotales()" class="item-iva w-full h-9 border border-blue-300 px-3 rounded-lg text-xs bg-blue-50 font-bold text-blue-900" required>
+                            <label class="label-hazmat block text-xs font-bold text-amber-800 mb-1">Hazmat (COP):</label>
+                            <input type="number" step="0.01" min="0" name="cobro_hazmat" value="{{ item.get('cobro_hazmat', '0.00') }}" oninput="recalcularTotales()" class="item-hazmat w-full h-9 border border-amber-300 px-3 rounded-lg text-xs bg-amber-50/50 font-bold text-amber-900">
+                        </div>
+                        <div>
+                            <label class="label-certificado block text-xs font-bold text-indigo-800 mb-1">Certificado (COP):</label>
+                            <input type="number" step="0.01" min="0" name="cobro_certificado" value="{{ item.get('cobro_certificado', '0.00') }}" oninput="recalcularTotales()" class="item-certificado w-full h-9 border border-indigo-300 px-3 rounded-lg text-xs bg-indigo-50/50 font-bold text-indigo-900">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-emerald-800 mb-1">Condición IVA:</label>
+                            <select name="sin_iva" onchange="cambiarCondicionIvaItem(this)" class="item-sin-iva w-full h-9 border border-emerald-400 px-2 rounded-lg text-xs bg-emerald-50 font-extrabold text-emerald-900">
+                                <option value="0" {% if not item_es_exento %}selected{% endif %}>Con IVA / TAX</option>
+                                <option value="1" {% if item_es_exento %}selected{% endif %}>Sin IVA / Exento (0%)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-blue-700 mb-1">Impuesto (%):</label>
+                            <input type="number" step="0.01" min="0" max="100" name="iva_item" value="{% if item_es_exento %}0{% else %}{{ item.get('iva_item', d.get('iva_porcentaje', '19')) }}{% endif %}" oninput="sincronizarInputIvaItem(this); recalcularTotales();" class="item-iva w-full h-9 border border-blue-300 px-3 rounded-lg text-xs bg-blue-50 font-bold text-blue-900 {% if item_es_exento %}opacity-60 bg-slate-100{% endif %}" {% if item_es_exento %}readonly{% endif %} required>
                         </div>
                         <div class="bg-white border border-slate-200 rounded-lg h-9 px-3 flex items-center justify-between">
-                            <span class="text-[10px] uppercase font-bold text-slate-400">Total Ítem:</span>
-                            <span class="item-total-preview text-sm font-extrabold text-[#002060]">$0.00</span>
+                            <span class="label-total-item text-[10px] uppercase font-bold text-slate-400">Total (COP):</span>
+                            <span class="item-total-preview text-xs sm:text-sm font-extrabold text-[#002060]">$0.00</span>
                         </div>
                     </div>
                 </div>
@@ -145,7 +166,7 @@
                 <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Método de pago:</label>
                     {% set metodos_actuales = d.get('metodo_pago', '') %}
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-3">
                         {% for mp in metodos_pago_opciones %}
                         <label class="flex items-center gap-2 border border-slate-300 rounded-lg h-10 px-3 cursor-pointer hover:bg-blue-50 transition text-xs font-bold bg-white shadow-sm">
                             <input type="checkbox" name="metodos_pago_check" value="{{ mp }}" onchange="actualizarDesglosePagos()" {% if mp.lower() in metodos_actuales.lower() %}checked{% endif %} class="metodo-check rounded text-blue-600">
@@ -167,21 +188,25 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-900 text-white p-4 rounded-xl shadow-inner">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-slate-900 text-white p-4 rounded-xl shadow-inner">
                 <div>
-                    <span class="text-[10px] uppercase text-slate-400 block font-bold">Subtotal</span>
+                    <span id="label-resumen-subtotal" class="text-[10px] uppercase text-slate-400 block font-bold">Subtotal + Adicionales (COP)</span>
                     <span id="resumen-subtotal" class="text-lg font-extrabold">$0.00</span>
                 </div>
                 <div>
-                    <span class="text-[10px] uppercase text-slate-400 block font-bold">Total Impuestos</span>
+                    <span id="label-resumen-adicionales" class="text-[10px] uppercase text-amber-300 block font-bold">Hazmat + Certificados (COP)</span>
+                    <span id="resumen-adicionales" class="text-lg font-extrabold text-amber-300">$0.00</span>
+                </div>
+                <div>
+                    <span id="label-resumen-impuestos" class="text-[10px] uppercase text-slate-400 block font-bold">Total Impuestos (COP)</span>
                     <span id="resumen-impuestos" class="text-lg font-extrabold text-sky-400">$0.00</span>
                 </div>
                 <div>
-                    <span class="text-[10px] uppercase text-slate-400 block font-bold">Costo Nacionalización</span>
+                    <span id="label-resumen-nacionalizacion" class="text-[10px] uppercase text-slate-400 block font-bold">Costo Nacionalización (COP)</span>
                     <span id="resumen-nacionalizacion" class="text-lg font-extrabold text-amber-400">$0.00</span>
                 </div>
                 <div class="sm:border-l border-slate-700 sm:pl-3">
-                    <span class="text-[10px] uppercase text-emerald-300 block font-bold">Total Final</span>
+                    <span id="label-resumen-total" class="text-[10px] uppercase text-emerald-300 block font-bold">Total Final (COP)</span>
                     <span id="resumen-gran-total" class="text-xl font-extrabold text-emerald-400">$0.00</span>
                 </div>
             </div>
@@ -237,7 +262,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-amber-800 mb-1">Valor de Nacionalización ($):</label>
+                        <label id="label_valor_nacionalizacion" class="block text-xs font-bold text-amber-800 mb-1">Valor de Nacionalización (USD $):</label>
                         <input type="number" step="0.01" min="0" name="valor_nacionalizacion" id="valor_nacionalizacion" value="{{ d.get('valor_nacionalizacion', '0.00') }}" oninput="recalcularTotales()" class="w-full h-10 border border-amber-400 px-3 rounded-lg text-xs bg-amber-50 font-bold text-amber-900">
                     </div>
                     <div>
@@ -248,8 +273,9 @@
             </div>
         </div>
 
-        <div class="mb-7">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">5. Cierre y Documentación</h2>
+        <!-- SECCIÓN 5: CIERRE Y DOCUMENTACIÓN MÚLTIPLE CON ALPINE.JS (VISTA PREVIA Y ELIMINACIÓN) -->
+        <div class="mb-7" x-data="documentosPoApp()">
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">5. Cierre y Documentación Múltiple (Hasta 10 Archivos en Google Drive)</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 items-end">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Referencia / N° Factura / Soporte:</label>
@@ -264,18 +290,72 @@
                     </select>
                 </div>
             </div>
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-blue-800 mb-1.5">Adjuntar Documentación (PDF / Factura):</label>
-                <input type="file" name="archivo_documentacion" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx" class="w-full h-10 border border-blue-300 bg-blue-50/40 px-2 py-1.5 rounded-lg text-xs file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-[#002060] file:text-white hover:file:bg-blue-900 cursor-pointer">
-            </div>
-            {% if d.get('documentacion_archivo') %}
-            <div class="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-semibold flex items-center justify-between">
-                <span>Documento cargado: <strong>{{ d.get('documentacion_archivo') }}</strong></span>
-                {% if d.get('documentacion_drive_link') %}
-                <a href="{{ d.get('documentacion_drive_link') }}" target="_blank" class="underline font-bold">Abrir en Google Drive</a>
+
+            <div class="mb-4 p-4 bg-blue-50/40 border border-blue-200 rounded-xl">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <label class="block text-xs font-extrabold text-blue-900">
+                        Adjuntar Documentación a la PO (PDF, Imágenes, Excel, Word — Máx. 10 archivos):
+                    </label>
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-900"
+                          x-text="`Total adjuntos: ${documentosExistentes.length + archivosNuevos.length} / 10`">
+                    </span>
+                </div>
+
+                <input type="file" name="archivos_documentacion" id="input_archivos_po" multiple 
+                       @change="procesarArchivosSeleccionados($event)"
+                       class="block w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#002060] file:text-white hover:file:bg-blue-900 cursor-pointer">
+                
+                <p class="text-[11px] font-bold text-red-600 mt-1.5 hidden" id="error-limite-archivos"></p>
+
+                <!-- Listado interactivo de archivos nuevos seleccionados con botón Quitar -->
+                <template x-if="archivosNuevos.length > 0">
+                    <div class="mt-3 space-y-1.5">
+                        <span class="text-[11px] font-bold uppercase text-slate-600 block">Archivos nuevos listos para cargar:</span>
+                        <template x-for="(file, index) in archivosNuevos" :key="index">
+                            <div class="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-blue-200 text-xs shadow-xs">
+                                <div class="flex items-center gap-2 truncate">
+                                    <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                                    <span class="font-bold text-slate-800 truncate" x-text="file.name"></span>
+                                    <span class="text-[10px] text-slate-400" x-text="`(${(file.size / 1024).toFixed(1)} KB)`"></span>
+                                </div>
+                                <button type="button" @click="removerArchivoNuevo(index)"
+                                        class="text-red-600 hover:bg-red-50 px-2 py-0.5 rounded font-bold text-[11px] transition">
+                                    Quitar
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Listado de documentos ya sincronizados en Google Drive (Modo Edición) -->
+                {% set docs_actuales = d.get('documentos_adjuntos', []) %}
+                {% if docs_actuales %}
+                <div class="mt-3 space-y-1.5 pt-2 border-t border-blue-100" x-show="documentosExistentes.length > 0">
+                    <span class="text-[11px] font-bold uppercase text-slate-600 block">Documentos ya sincronizados en esta PO:</span>
+                    <template x-for="doc in documentosExistentes" :key="doc.id">
+                        <div class="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-emerald-200 text-xs text-slate-800 font-semibold shadow-xs">
+                            <div class="flex items-center gap-2 truncate">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                <a :href="doc.drive_link || '#'" target="_blank" class="text-blue-600 hover:underline font-bold truncate" x-text="doc.nombre_archivo"></a>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <a :href="`/pedidos/{{ pedido.id if pedido else 0 }}/documento?nombre=${encodeURIComponent(doc.nombre_archivo)}`" 
+                                   class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]" x-show="{{ 'true' if pedido else 'false' }}">
+                                    Descargar
+                                </a>
+                                {% if pedido %}
+                                <button type="button" @click="eliminarDocumentoServidor({{ pedido.id }}, doc.id, doc.nombre_archivo)"
+                                        class="px-2 py-0.5 rounded bg-red-100 hover:bg-red-200 text-red-700 font-bold text-[11px] transition">
+                                    Eliminar
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </template>
+                </div>
                 {% endif %}
             </div>
-            {% endif %}
+
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Observaciones Operativas:</label>
                 <textarea name="observaciones" rows="2" class="w-full border border-slate-300 p-3 rounded-lg text-xs">{{ d.get('observaciones', '') }}</textarea>
@@ -293,6 +373,63 @@
 </div>
 
 <script>
+function documentosPoApp() {
+    return {
+        archivosNuevos: [],
+        documentosExistentes: {{ d.get('documentos_adjuntos', []) | tojson | safe }},
+
+        procesarArchivosSeleccionados(event) {
+            const input = event.target;
+            const errorEl = document.getElementById('error-limite-archivos');
+            const totalActual = this.documentosExistentes.length + this.archivosNuevos.length + input.files.length;
+
+            if (totalActual > 10) {
+                errorEl.textContent = `Límite excedido: Puede adjuntar máximo 10 archivos por PO. Ya tiene ${this.documentosExistentes.length + this.archivosNuevos.length} registrados.`;
+                errorEl.classList.remove('hidden');
+                input.value = '';
+                return;
+            }
+            errorEl.classList.add('hidden');
+
+            for (let i = 0; i < input.files.length; i++) {
+                this.archivosNuevos.push(input.files[i]);
+            }
+            this.actualizarInputFiles();
+        },
+
+        removerArchivoNuevo(index) {
+            this.archivosNuevos.splice(index, 1);
+            this.actualizarInputFiles();
+            document.getElementById('error-limite-archivos').classList.add('hidden');
+        },
+
+        actualizarInputFiles() {
+            const input = document.getElementById('input_archivos_po');
+            const dt = new DataTransfer();
+            this.archivosNuevos.forEach(file => dt.items.add(file));
+            input.files = dt.files;
+        },
+
+        async eliminarDocumentoServidor(pedidoId, docId, nombreArchivo) {
+            if (!confirm(`¿Confirma eliminar el archivo «${nombreArchivo}» de la PO y de Google Drive?`)) return;
+            try {
+                const res = await fetch(`/pedidos/${pedidoId}/documento/${docId}/eliminar`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    this.documentosExistentes = this.documentosExistentes.filter(d => d.id !== docId);
+                } else {
+                    alert(data.msg || 'No fue posible eliminar el documento.');
+                }
+            } catch (e) {
+                alert('Error de conexión al eliminar el archivo.');
+            }
+        }
+    }
+}
+
 function actualizarDesglosePagos() {
     const checks = document.querySelectorAll('.metodo-check:checked');
     const seleccionados = Array.from(checks).map(c => c.value);
@@ -404,37 +541,124 @@ function cambiarTipoPedido(actualizarImpuesto) {
             aplicarIvaATodos();
         }
     }
+    actualizarEtiquetasMoneda();
     recalcularTotales();
+}
+
+function obtenerMonedaActual() {
+    const tipo = document.getElementById('tipo_pedido').value;
+    return (tipo === 'Internacional') ? 'USD' : 'COP';
+}
+
+function actualizarEtiquetasMoneda() {
+    const moneda = obtenerMonedaActual();
+    const badgeMoneda = document.getElementById('badge-moneda-activa');
+    if (badgeMoneda) {
+        badgeMoneda.textContent = `Moneda Activa: ${moneda} ($)`;
+        badgeMoneda.className = (moneda === 'USD')
+            ? 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-sky-50 text-sky-900 border border-sky-200'
+            : 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200';
+    }
+
+    document.querySelectorAll('.label-precio-unit').forEach(el => {
+        el.textContent = `Precio Unit. (${moneda}):`;
+    });
+    document.querySelectorAll('.label-hazmat').forEach(el => {
+        el.textContent = `Hazmat (${moneda}):`;
+    });
+    document.querySelectorAll('.label-certificado').forEach(el => {
+        el.textContent = `Certificado (${moneda}):`;
+    });
+    document.querySelectorAll('.label-total-item').forEach(el => {
+        el.textContent = `Total (${moneda}):`;
+    });
+
+    const lblSub = document.getElementById('label-resumen-subtotal');
+    const lblAdic = document.getElementById('label-resumen-adicionales');
+    const lblImp = document.getElementById('label-resumen-impuestos');
+    const lblNac = document.getElementById('label-resumen-nacionalizacion');
+    const lblTot = document.getElementById('label-resumen-total');
+
+    if (lblSub) lblSub.textContent = `Subtotal + Adicionales (${moneda})`;
+    if (lblAdic) lblAdic.textContent = `Hazmat + Certificados (${moneda})`;
+    if (lblImp) lblImp.textContent = `Total Impuestos (${moneda})`;
+    if (lblNac) lblNac.textContent = `Costo Nacionalización (${moneda})`;
+    if (lblTot) lblTot.textContent = `Total Final (${moneda})`;
+}
+
+function cambiarCondicionIvaItem(selectEl) {
+    const row = selectEl.closest('.item-row');
+    const inputIva = row.querySelector('.item-iva');
+    const ivaBase = document.getElementById('iva_porcentaje_base').value || '19';
+
+    if (selectEl.value === '1') {
+        inputIva.value = '0';
+        inputIva.readOnly = true;
+        inputIva.classList.add('opacity-60', 'bg-slate-100');
+    } else {
+        inputIva.readOnly = false;
+        inputIva.classList.remove('opacity-60', 'bg-slate-100');
+        if (parseFloat(inputIva.value || '0') === 0) {
+            inputIva.value = ivaBase;
+        }
+    }
+    recalcularTotales();
+}
+
+function sincronizarInputIvaItem(inputIva) {
+    const row = inputIva.closest('.item-row');
+    const selectSinIva = row.querySelector('.item-sin-iva');
+    const val = parseFloat(inputIva.value || '0');
+    if (selectSinIva) {
+        selectSinIva.value = (val === 0) ? '1' : '0';
+    }
 }
 
 function aplicarIvaATodos() {
     const ivaBase = document.getElementById('iva_porcentaje_base').value || '0';
-    document.querySelectorAll('.item-iva').forEach(inp => {
-        inp.value = ivaBase;
+    document.querySelectorAll('.item-row').forEach(row => {
+        const selSinIva = row.querySelector('.item-sin-iva');
+        const inpIva = row.querySelector('.item-iva');
+        if (selSinIva && selSinIva.value === '1') {
+            inpIva.value = '0';
+        } else if (inpIva) {
+            inpIva.value = ivaBase;
+        }
     });
     recalcularTotales();
 }
 
 function recalcularTotales() {
     let subtotalGeneral = 0;
+    let adicionalesGeneral = 0;
     let impuestosGeneral = 0;
     const tipo = document.getElementById('tipo_pedido').value;
+    const moneda = obtenerMonedaActual();
 
     document.querySelectorAll('.item-row').forEach(row => {
         const cant = parseFloat(row.querySelector('.item-cant').value) || 0;
         const precio = parseFloat(row.querySelector('.item-precio').value) || 0;
-        const iva = parseFloat(row.querySelector('.item-iva').value) || 0;
+        const hazmatEl = row.querySelector('.item-hazmat');
+        const certEl = row.querySelector('.item-certificado');
+        const sinIvaEl = row.querySelector('.item-sin-iva');
+        const ivaEl = row.querySelector('.item-iva');
 
-        const sub = cant * precio;
+        const hazmat = hazmatEl ? (parseFloat(hazmatEl.value) || 0) : 0;
+        const certificado = certEl ? (parseFloat(certEl.value) || 0) : 0;
+        const esSinIva = sinIvaEl && sinIvaEl.value === '1';
+        const iva = esSinIva ? 0 : (parseFloat(ivaEl.value) || 0);
+
+        const sub = (cant * precio) + hazmat + certificado;
         const imp = sub * (iva / 100.0);
         const tot = sub + imp;
 
         subtotalGeneral += sub;
+        adicionalesGeneral += (hazmat + certificado);
         impuestosGeneral += imp;
 
         const preview = row.querySelector('.item-total-preview');
         if (preview) {
-            preview.textContent = '$' + tot.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            preview.textContent = '$' + tot.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + moneda;
         }
     });
 
@@ -442,9 +666,13 @@ function recalcularTotales() {
     const granTotal = subtotalGeneral + impuestosGeneral + valNac;
 
     document.getElementById('resumen-subtotal').textContent = '$' + subtotalGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const elAdic = document.getElementById('resumen-adicionales');
+    if (elAdic) {
+        elAdic.textContent = '$' + adicionalesGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
     document.getElementById('resumen-impuestos').textContent = '$' + impuestosGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('resumen-nacionalizacion').textContent = '$' + valNac.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    document.getElementById('resumen-gran-total').textContent = '$' + granTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('resumen-gran-total').textContent = '$' + granTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + moneda;
 }
 
 function agregarItem() {
@@ -455,14 +683,21 @@ function agregarItem() {
     const ivaBase = document.getElementById('iva_porcentaje_base').value || '19';
     newRow.querySelectorAll('input').forEach(input => {
         if (input.name === 'cantidad') input.value = '1';
-        else if (input.name === 'iva_item') input.value = ivaBase;
+        else if (input.name === 'cobro_hazmat' || input.name === 'cobro_certificado') input.value = '0.00';
+        else if (input.name === 'iva_item') {
+            input.value = ivaBase;
+            input.readOnly = false;
+            input.classList.remove('opacity-60', 'bg-slate-100');
+        }
         else input.value = '';
     });
     newRow.querySelectorAll('select').forEach(sel => {
         if (sel.name === 'estado_producto') sel.value = 'PENDIENTE';
         if (sel.name === 'unidad_medida') sel.value = 'UND';
+        if (sel.name === 'sin_iva') sel.value = '0';
     });
     container.appendChild(newRow);
+    actualizarEtiquetasMoneda();
     recalcularTotales();
 }
 

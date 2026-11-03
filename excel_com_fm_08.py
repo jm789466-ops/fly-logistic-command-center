@@ -20,17 +20,19 @@ ENC_NACIONAL = [
     "11. Cantidad",
     "12. Estado del Producto",
     "13. Método de pago",
-    "14. Precio unitario inicial ($)",
-    "15. Precio total ($)",
-    "16. IVA (19%) (%)",
-    "17. Valor después de IVA ($)",
-    "18. Plazo de entrega prometido",
-    "19. Días Hábiles (Semáforo)",
-    "20. Fecha de entrega al cliente",
-    "21. Número de remisión",
-    "22. Documentación",
-    "23. Estado PO",
-    "24. Observaciones",
+    "14. Precio unitario inicial (COP $)",
+    "15. Cobro Hazmat (COP $)",
+    "16. Cobro Certificado (COP $)",
+    "17. Precio total / Subtotal (COP $)",
+    "18. IVA (19% / Exento 0%) (%)",
+    "19. Valor después de IVA (COP $)",
+    "20. Plazo de entrega prometido",
+    "21. Días Hábiles (Semáforo)",
+    "22. Fecha de entrega al cliente",
+    "23. Número de remisión",
+    "24. Documentación",
+    "25. Estado PO",
+    "26. Observaciones",
 ]
 
 ENC_INTERNACIONAL = [
@@ -47,21 +49,37 @@ ENC_INTERNACIONAL = [
     "11. Cantidad",
     "12. Estado del Producto",
     "13. Método de pago",
-    "14. Precio unitario inicial ($)",
-    "15. Precio total ($)",
-    "16. TAX (7%) (%)",
-    "17. Valor después de TAX + Nac. ($)",
-    "18. Plazo de entrega prometido",
-    "19. Días Hábiles (Semáforo)",
-    "20. Fecha de entrega warehouse EEUU",
-    "21. Tracking",
-    "22. Nacionalización (Estado)",
-    "23. Valor de la nacionalización ($)",
-    "24. Fecha de Nacionalización",
-    "25. Documentación",
-    "26. Estado PO",
-    "27. Observaciones",
+    "14. Precio unitario inicial (USD $)",
+    "15. Cobro Hazmat (USD $)",
+    "16. Cobro Certificado (USD $)",
+    "17. Precio total / Subtotal (USD $)",
+    "18. TAX (7% / Exento 0%) (%)",
+    "19. Valor después de TAX + Nac. (USD $)",
+    "20. Plazo de entrega prometido",
+    "21. Días Hábiles (Semáforo)",
+    "22. Fecha de entrega warehouse EEUU",
+    "23. Tracking",
+    "24. Nacionalización (Estado)",
+    "25. Valor de la nacionalización (USD $)",
+    "26. Fecha de Nacionalización",
+    "27. Documentación",
+    "28. Estado PO",
+    "29. Observaciones",
 ]
+
+
+def _obtener_texto_documentacion(p) -> str:
+    doc_texto = p.documentacion or ""
+    nombres_adjuntos = []
+    if getattr(p, "documentos", None):
+        nombres_adjuntos = [d.nombre_archivo for d in p.documentos if d.nombre_archivo]
+    elif getattr(p, "documentacion_archivo", None):
+        nombres_adjuntos = [x.strip() for x in p.documentacion_archivo.split("|") if x.strip()]
+
+    for nom in nombres_adjuntos:
+        if nom not in doc_texto:
+            doc_texto = f"{doc_texto} [{nom}]".strip()
+    return doc_texto
 
 
 def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
@@ -72,9 +90,7 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
     num_items = max(len(items_lista), 1)
     val_nac_por_item = round(val_nac_total / num_items, 2) if not es_nacional else 0.0
     semaforo = p.dias_habiles_info["detalle"]
-    doc_texto = p.documentacion or ""
-    if getattr(p, "documentacion_archivo", None) and p.documentacion_archivo not in doc_texto:
-        doc_texto = f"{doc_texto} [{p.documentacion_archivo}]".strip()
+    doc_texto = _obtener_texto_documentacion(p)
 
     relleno_fila = PatternFill("solid", fgColor=color_hex)
     borde_fino = Border(
@@ -86,7 +102,13 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
 
     fila_actual = fila_inicio
     for item in items_lista:
-        iva_pct = float(item.iva_porcentaje if item.iva_porcentaje is not None else (19 if es_nacional else 7))
+        es_exento = bool(getattr(item, "sin_iva", 0)) or float(item.iva_porcentaje or 0) == 0.0
+        iva_pct = 0.0 if es_exento else float(
+            item.iva_porcentaje if item.iva_porcentaje is not None else (19 if es_nacional else 7)
+        )
+        hazmat_val = float(getattr(item, "cobro_hazmat", 0) or 0)
+        cert_val = float(getattr(item, "cobro_certificado", 0) or 0)
+
         base_fila = [
             p.fecha_inicial,
             p.po,
@@ -102,12 +124,14 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
             getattr(item, "estado_producto", "PENDIENTE") or "PENDIENTE",
             p.metodo_pago or "",
             float(item.precio_unitario),
-            f"=K{fila_actual}*N{fila_actual}",
+            hazmat_val,
+            cert_val,
+            f"=(K{fila_actual}*N{fila_actual})+O{fila_actual}+P{fila_actual}",
             iva_pct,
         ]
 
         if es_nacional:
-            valor_despues = f"=O{fila_actual}*(1+P{fila_actual}/100)"
+            valor_despues = f"=Q{fila_actual}*(1+R{fila_actual}/100)"
             cola = [
                 valor_despues,
                 p.plazo_entrega,
@@ -120,7 +144,7 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
             ]
             ws.append(base_fila + cola)
         else:
-            valor_despues = f"=O{fila_actual}*(1+P{fila_actual}/100)+W{fila_actual}"
+            valor_despues = f"=Q{fila_actual}*(1+R{fila_actual}/100)+Y{fila_actual}"
             cola = [
                 valor_despues,
                 p.plazo_entrega,
@@ -136,36 +160,35 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
             ]
             ws.append(base_fila + cola)
 
-        total_cols = 24 if es_nacional else 27
+        total_cols = 26 if es_nacional else 29
         for col_i in range(1, total_cols + 1):
             celda = ws.cell(fila_actual, col_i)
             celda.fill = relleno_fila
             celda.border = borde_fino
             if hasattr(celda.value, "year"):
                 celda.number_format = "YYYY-MM-DD"
-        for col_moneda in ("N", "O", "Q"):
+        for col_moneda in ("N", "O", "P", "Q", "S"):
             ws[f"{col_moneda}{fila_actual}"].number_format = '"$"#,##0.00'
         if not es_nacional:
-            ws[f"W{fila_actual}"].number_format = '"$"#,##0.00'
+            ws[f"Y{fila_actual}"].number_format = '"$"#,##0.00'
 
         fila_actual += 1
 
     ult_item_fila = fila_actual - 1
-    ws[f"M{fila_actual}"] = f"TOTALES PO {p.po}:"
+    ws[f"M{fila_actual}"] = f"TOTALES PO {p.po} ({p.moneda}):"
     ws[f"M{fila_actual}"].font = Font(bold=True, color="002060")
-    ws[f"O{fila_actual}"] = f"=SUM(O{fila_inicio}:O{ult_item_fila})"
-    ws[f"O{fila_actual}"].font = Font(bold=True)
-    ws[f"O{fila_actual}"].number_format = '"$"#,##0.00'
-    ws[f"Q{fila_actual}"] = f"=SUM(Q{fila_inicio}:Q{ult_item_fila})"
-    ws[f"Q{fila_actual}"].font = Font(bold=True, color="002060")
-    ws[f"Q{fila_actual}"].number_format = '"$"#,##0.00'
+
+    for col_sum in ("O", "P", "Q", "S"):
+        ws[f"{col_sum}{fila_actual}"] = f"=SUM({col_sum}{fila_inicio}:{col_sum}{ult_item_fila})"
+        ws[f"{col_sum}{fila_actual}"].font = Font(bold=True, color="002060" if col_sum == "S" else "000000")
+        ws[f"{col_sum}{fila_actual}"].number_format = '"$"#,##0.00'
 
     if not es_nacional:
-        ws[f"W{fila_actual}"] = f"=SUM(W{fila_inicio}:W{ult_item_fila})"
-        ws[f"W{fila_actual}"].font = Font(bold=True, color="002060")
-        ws[f"W{fila_actual}"].number_format = '"$"#,##0.00'
+        ws[f"Y{fila_actual}"] = f"=SUM(Y{fila_inicio}:Y{ult_item_fila})"
+        ws[f"Y{fila_actual}"].font = Font(bold=True, color="002060")
+        ws[f"Y{fila_actual}"].number_format = '"$"#,##0.00'
 
-    total_cols = 24 if es_nacional else 27
+    total_cols = 26 if es_nacional else 29
     for col_i in range(1, total_cols + 1):
         c_tot = ws.cell(fila_actual, col_i)
         c_tot.fill = relleno_fila
@@ -176,11 +199,11 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
 
 def _preparar_hoja_cuadro(ws, es_nacional: bool):
     if es_nacional:
-        ws.merge_cells("A1:X1")
-        titulo, encabezados = "CUADRO DE COMPRAS NACIONALES FLY LOGISTIC 2026", ENC_NACIONAL
+        ws.merge_cells("A1:Z1")
+        titulo, encabezados = "CUADRO DE COMPRAS NACIONALES FLY LOGISTIC 2026 (COP)", ENC_NACIONAL
     else:
-        ws.merge_cells("A1:AA1")
-        titulo, encabezados = "CUADRO DE COMPRAS EN EL EXTERIOR FLY LOGISTIC 2026", ENC_INTERNACIONAL
+        ws.merge_cells("A1:AC1")
+        titulo, encabezados = "CUADRO DE COMPRAS EN EL EXTERIOR FLY LOGISTIC 2026 (USD)", ENC_INTERNACIONAL
 
     t = ws["A1"]
     t.value = titulo
@@ -250,7 +273,7 @@ def generar_excel_maestro_productos(ruta: str, pedidos: list):
     ws = wb.active
     ws.title = "Estado_Global_Productos"
 
-    ws.merge_cells("A1:P1")
+    ws.merge_cells("A1:W1")
     ws["A1"] = "CONTROL MAESTRO DE PRODUCTOS, COMPRAS Y ESTADOS POR PO · FLY LOGISTIC 2026"
     ws["A1"].font = Font(bold=True, size=14, color="FFFFFF")
     ws["A1"].fill = PatternFill("solid", fgColor="002060")
@@ -258,10 +281,11 @@ def generar_excel_maestro_productos(ruta: str, pedidos: list):
     ws.row_dimensions[1].height = 28
 
     enc = [
-        "PO", "Tipo Operación", "Asesor Responsable", "Cliente", "Fecha Inicial PO",
+        "PO", "Tipo Operación", "Moneda", "Asesor Responsable", "Cliente", "Fecha Inicial PO",
         "Plazo Entrega PO", "Semáforo PO", "Estado General PO", "Proveedor (Origen)",
         "Fecha Compra Proveedor", "¿Comprado?", "Part Number / Parte Número", "Descripción Producto",
-        "Cantidad", "Unidad", "Estado del Producto"
+        "Cantidad", "Unidad", "Precio Unitario", "Cobro Hazmat", "Cobro Certificado",
+        "Subtotal Ítem", "IVA / TAX (%)", "Total Ítem c/Imp.", "Estado del Producto"
     ]
     ws.append(enc)
     for c in ws[2]:
@@ -280,12 +304,17 @@ def generar_excel_maestro_productos(ruta: str, pedidos: list):
 
     fila_idx = 3
     for p in pedidos_urgencia:
+        moneda = "COP" if p.tipo == "Nacional" else "USD"
         for it in p.items:
             comprado_txt = "SÍ" if it.fecha_compra_proveedor else "FALTA COMPRAR"
             sku = f"{it.parte_numero} (Alt: {it.parte_numero_alterno})" if it.parte_numero_alterno else it.parte_numero
+            es_exento = bool(getattr(it, "sin_iva", 0)) or float(it.iva_porcentaje or 0) == 0.0
+            iva_mostrar = 0.0 if es_exento else float(it.iva_porcentaje or 0)
+
             ws.append([
                 p.po,
                 p.tipo,
+                moneda,
                 p.asesor.nombre if p.asesor else "",
                 p.cliente.nombre if p.cliente else "",
                 p.fecha_inicial.isoformat() if p.fecha_inicial else "",
@@ -299,11 +328,20 @@ def generar_excel_maestro_productos(ruta: str, pedidos: list):
                 it.descripcion,
                 int(it.cantidad),
                 it.unidad_medida or "UND",
+                float(it.precio_unitario or 0),
+                float(getattr(it, "cobro_hazmat", 0) or 0),
+                float(getattr(it, "cobro_certificado", 0) or 0),
+                float(it.subtotal_item),
+                iva_mostrar,
+                float(it.total_item),
                 it.estado_producto or "PENDIENTE",
             ])
-            color_est = "FEE2E2" if not it.fecha_compra_proveedor or (it.estado_producto == "PENDIENTE") else "DCFCE7"
-            ws[f"K{fila_idx}"].fill = PatternFill("solid", fgColor=color_est)
-            ws[f"P{fila_idx}"].fill = PatternFill("solid", fgColor=color_est)
+            color_compra = "DCFCE7" if it.fecha_compra_proveedor else "FEE2E2"
+            color_est = "FEE2E2" if (not it.fecha_compra_proveedor or it.estado_producto == "PENDIENTE") else "DCFCE7"
+            ws[f"L{fila_idx}"].fill = PatternFill("solid", fgColor=color_compra)
+            ws[f"W{fila_idx}"].fill = PatternFill("solid", fgColor=color_est)
+            for col_m in ("Q", "R", "S", "T", "V"):
+                ws[f"{col_m}{fila_idx}"].number_format = '"$"#,##0.00'
             fila_idx += 1
 
     for i in range(1, len(enc) + 1):

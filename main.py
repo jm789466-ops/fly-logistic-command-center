@@ -4,13 +4,20 @@ import json
 import os
 import re
 import secrets
+import shutil
 import smtplib
 import ssl
 import traceback
 import warnings
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from email.message import EmailMessage
+
+try:
+    from zoneinfo import ZoneInfo
+    BOGOTA_TZ = ZoneInfo("America/Bogota")
+except Exception:
+    BOGOTA_TZ = timezone(timedelta(hours=-5))
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -44,17 +51,34 @@ NOMBRE_ADMIN = "Juan Esteban Martínez"
 ROLES_SISTEMA = ["Administrador", "Gerencia", "Jefe de area", "Asesor"]
 ROLES_SUPERIORES = ["Administrador", "Gerencia", "Jefe de area"]
 ROLES_ACCESO_USUARIOS = ["Administrador", "Gerencia", "Jefe de area"]
+ROLES_GERENCIA_ADMIN = ["Administrador", "Gerencia"]
 
 ESTADOS = ["En proceso", "Entregado"]
 ESTADOS_ADUANA = ["No aplica / Pendiente", "En revisión aduanera", "Pago de aranceles", "Liberado / Nacionalizado"]
 ESTADOS_PRODUCTO = ["PENDIENTE", "DESPACHADO", "EN FLY", "LLEGADO FLY", "ENTREGADO"]
-METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia"]
+METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia", "Efectivo"]
 UNIDADES_MEDIDA = ["UND", "EA", "GAL", "LT", "KIT", "LB", "ROLLO", "CAJA", "MT", "PC", "SET"]
+
+MAX_ARCHIVOS_PO = 10
+HORA_LIMITE_ASESOR = time(17, 30)  # Restricción horaria 5:30 p.m.[cite: 3]
 
 PESOS_PROBABILIDAD = {
     "En proceso": 25,
     "Entregado": 100,
 }
+
+
+def validar_horario_asesor(user: models.Asesor) -> tuple[bool, str]:
+    if os.getenv("DESACTIVAR_RESTRICCION_HORARIA", "0") == "1":
+        return True, ""
+    if user and user.rol not in ROLES_SUPERIORES:
+        ahora_col = datetime.now(BOGOTA_TZ).time()
+        if ahora_col >= HORA_LIMITE_ASESOR:
+            return (
+                False,
+                "Restricción de seguridad: El horario operativo para creación y edición de órdenes por asesores finalizó a las 5:30 p.m. Contacte a su Jefe de Área o Gerencia."
+            )
+    return True, ""
 
 
 def cargar_secret_key() -> str:
@@ -142,7 +166,24 @@ def subir_archivo_a_carpeta_drive(service, ruta_local, nombre_archivo, id_carpet
     ).execute()
 
 
-def sincronizar_po_en_drive(service, p: models.Pedido, ruta_excel_local: str, nombre_excel: str, ruta_doc_local: str | None = None):
+def eliminar_archivo_de_drive(service, file_id: str) -> bool:
+    if not service or not file_id:
+        return False
+    try:
+        service.files().delete(fileId=file_id).execute()
+        return True
+    except Exception:
+        return False
+
+
+def sincronizar_po_en_drive(
+    service,
+    p: models.Pedido,
+    ruta_excel_local: str,
+    nombre_excel: str,
+    ruta_doc_local: str | None = None,
+    rutas_docs_locales: list[str] | None = None
+):
     raiz = "Pedidos Nacionales" if p.tipo == "Nacional" else "Pedidos Internacionales"
     id_raiz, _ = carpeta_drive(service, raiz)
     id_asesor, _ = carpeta_drive(service, p.asesor.nombre, id_raiz)
@@ -156,6 +197,24 @@ def sincronizar_po_en_drive(service, p: models.Pedido, ruta_excel_local: str, no
         nombre_doc = os.path.basename(ruta_doc_local)
         res_doc = subir_archivo_a_carpeta_drive(service, ruta_doc_local, nombre_doc, id_po_folder)
         link_doc = res_doc.get("webViewLink", "")
+
+    carpeta_local = carpeta_po_local(p)
+    for doc_obj in getattr(p, "documentos", []) or []:
+        ruta_cand = os.path.join(carpeta_local, doc_obj.nombre_archivo)
+        if os.path.exists(ruta_cand):
+            res_d = subir_archivo_a_carpeta_drive(service, ruta_cand, doc_obj.nombre_archivo, id_po_folder)
+            doc_obj.drive_file_id = res_d.get("id", "") or doc_obj.drive_file_id
+            doc_obj.drive_link = res_d.get("webViewLink", "") or doc_obj.drive_link
+            if not link_doc:
+                link_doc = doc_obj.drive_link
+
+    if rutas_docs_locales:
+        for r_local in rutas_docs_locales:
+            if r_local and os.path.exists(r_local):
+                nom_d = os.path.basename(r_local)
+                res_d = subir_archivo_a_carpeta_drive(service, r_local, nom_d, id_po_folder)
+                if not link_doc:
+                    link_doc = res_d.get("webViewLink", "")
 
     return link_excel, link_po_folder, link_doc
 
@@ -180,14 +239,23 @@ def carpeta_po_local(p: models.Pedido) -> str:
 
 def ruta_excel(p: models.Pedido):
     carpeta = carpeta_po_local(p)
-    nombre = f"Pedido_{nombre_seguro(p.po)}.xlsx"
+    codigo_po = p.po_codigo if hasattr(p, "po_codigo") else p.po
+    nombre = f"Pedido_{nombre_seguro(codigo_po)}.xlsx"
     return os.path.join(carpeta, nombre), nombre
+
+
+def sincronizar_resumen_documentos_po(p: models.Pedido):
+    nombres = [d.nombre_archivo for d in (p.documentos or []) if d.nombre_archivo]
+    p.documentacion_archivo = " | ".join(nombres) if nombres else None
+    if nombres and not p.documentacion:
+        p.documentacion = ", ".join(nombres)
 
 
 async def guardar_archivo_documentacion(p: models.Pedido, archivo_subido: UploadFile | None) -> str | None:
     if not archivo_subido or not archivo_subido.filename or not archivo_subido.filename.strip():
         if p.documentacion_archivo:
-            posible = os.path.join(carpeta_po_local(p), p.documentacion_archivo)
+            primer_arch = p.documentacion_archivo.split("|")[0].strip()
+            posible = os.path.join(carpeta_po_local(p), primer_arch)
             if os.path.exists(posible):
                 return posible
         return None
@@ -198,14 +266,62 @@ async def guardar_archivo_documentacion(p: models.Pedido, archivo_subido: Upload
     if contenido:
         with open(ruta_destino, "wb") as f_out:
             f_out.write(contenido)
-        p.documentacion_archivo = nombre_limpio
-        if not p.documentacion:
-            p.documentacion = nombre_limpio
+        ya_existe = any(d.nombre_archivo == nombre_limpio for d in (p.documentos or []))
+        if not ya_existe:
+            p.documentos.append(models.PedidoDocumento(nombre_archivo=nombre_limpio))
+        sincronizar_resumen_documentos_po(p)
         return ruta_destino
     return None
 
 
-def generar_salidas(db: Session, p: models.Pedido, ruta_doc_local: str | None = None) -> str:
+async def guardar_archivos_documentacion_multiple(
+    db: Session,
+    p: models.Pedido,
+    archivos_subidos: list[UploadFile]
+) -> list[str]:
+    archivos_validos = [
+        a for a in (archivos_subidos or [])
+        if isinstance(a, UploadFile) and a.filename and a.filename.strip()
+    ]
+    if not archivos_validos:
+        return []
+
+    existentes_nombres = {d.nombre_archivo for d in (p.documentos or [])}
+    nuevos_netos = [
+        a for a in archivos_validos
+        if nombre_seguro(os.path.basename(a.filename)) not in existentes_nombres
+    ]
+    if len(existentes_nombres) + len(nuevos_netos) > MAX_ARCHIVOS_PO:
+        raise ValueError(
+            f"Límite superado: Cada Orden de Compra permite máximo {MAX_ARCHIVOS_PO} archivos adjuntos "
+            f"(actualmente tiene {len(existentes_nombres)} e intentó agregar {len(nuevos_netos)})."
+        )
+
+    carpeta = carpeta_po_local(p)
+    rutas_guardadas = []
+    for archivo in archivos_validos:
+        nombre_limpio = nombre_seguro(os.path.basename(archivo.filename))
+        ruta_destino = os.path.join(carpeta, nombre_limpio)
+        contenido = await archivo.read()
+        if contenido:
+            with open(ruta_destino, "wb") as f_out:
+                f_out.write(contenido)
+            rutas_guardadas.append(ruta_destino)
+            if nombre_limpio not in existentes_nombres:
+                p.documentos.append(models.PedidoDocumento(nombre_archivo=nombre_limpio))
+                existentes_nombres.add(nombre_limpio)
+
+    sincronizar_resumen_documentos_po(p)
+    db.flush()
+    return rutas_guardadas
+
+
+def generar_salidas(
+    db: Session,
+    p: models.Pedido,
+    ruta_doc_local: str | None = None,
+    rutas_docs_locales: list[str] | None = None
+) -> str:
     try:
         ruta, nombre = ruta_excel(p)
         generar_excel_com_fm_08(p, ruta)
@@ -215,37 +331,46 @@ def generar_salidas(db: Session, p: models.Pedido, ruta_doc_local: str | None = 
         service = obtener_drive()
         if service:
             if not ruta_doc_local and p.documentacion_archivo:
-                posible_doc = os.path.join(carpeta_po_local(p), p.documentacion_archivo)
+                primer_doc = p.documentacion_archivo.split("|")[0].strip()
+                posible_doc = os.path.join(carpeta_po_local(p), primer_doc)
                 if os.path.exists(posible_doc):
                     ruta_doc_local = posible_doc
-            link_excel, link_folder, link_doc = sincronizar_po_en_drive(service, p, ruta, nombre, ruta_doc_local)
+            link_excel, link_folder, link_doc = sincronizar_po_en_drive(
+                service, p, ruta, nombre, ruta_doc_local, rutas_docs_locales
+            )
             p.drive_link = link_excel or link_folder
             p.drive_folder_link = link_folder
             if link_doc:
                 p.documentacion_drive_link = link_doc
             db.commit()
-            return "Expediente y Excel sincronizados en Google Drive"
+            return "Expediente, documentos y Excel sincronizados en Google Drive"
         return "Expediente y Excel generados correctamente"
     except Exception as e:
         return f"Excel generado localmente ({e})"
 
 
 def sugerir_siguiente_po(db: Session) -> str:
-    todas_pos = [r[0] for r in db.query(models.Pedido.po).all() if r[0]]
-    max_num = 0
-    prefijo_detectado = "PO-"
-    ancho_num = 4
-    for po_str in todas_pos:
-        m = re.search(r"^(.*?)(\d+)$", po_str.strip())
-        if m:
-            num_val = int(m.group(2))
-            if num_val > max_num:
-                max_num = num_val
-                prefijo_detectado = m.group(1)
-                ancho_num = len(m.group(2))
-    if max_num == 0:
-        return "PO-0001"
-    return f"{prefijo_detectado}{str(max_num + 1).zfill(ancho_num)}"
+    """
+    Generador de consecutivo blindado para alta concurrencia masiva (10 a 100+ usuarios simultáneos)[cite: 3].
+    """
+    try:
+        todas_pos = [r[0] for r in db.query(models.Pedido.po).all() if r[0]]
+        max_num = 0
+        prefijo_detectado = "PO-"
+        ancho_num = 4
+        for po_str in todas_pos:
+            m = re.search(r"^(.*?)(\d+)$", po_str.strip())
+            if m:
+                num_val = int(m.group(2))
+                if num_val > max_num:
+                    max_num = num_val
+                    prefijo_detectado = m.group(1)
+                    ancho_num = len(m.group(2))
+        if max_num == 0:
+            return "PO-0001"
+        return f"{prefijo_detectado}{str(max_num + 1).zfill(ancho_num)}"
+    except Exception:
+        return f"PO-{secrets.token_hex(2).upper()}"
 
 
 ITER = 200_000
@@ -315,11 +440,32 @@ def migrar_bd():
             con.execute(text("UPDATE pedido_items SET parte_numero_alterno = '' WHERE parte_numero_alterno IS NULL"))
             con.execute(text("UPDATE pedido_items SET unidad_medida = 'UND' WHERE unidad_medida IS NULL OR unidad_medida = ''"))
             con.execute(text("UPDATE pedido_items SET iva_porcentaje = 19 WHERE iva_porcentaje IS NULL"))
+            con.execute(text("UPDATE pedido_items SET cobro_hazmat = 0 WHERE cobro_hazmat IS NULL"))
+            con.execute(text("UPDATE pedido_items SET cobro_certificado = 0 WHERE cobro_certificado IS NULL"))
+            con.execute(text("UPDATE pedido_items SET sin_iva = 0 WHERE sin_iva IS NULL"))
             con.execute(text("UPDATE pedido_items SET estado_producto = 'PENDIENTE' WHERE estado_producto IS NULL OR estado_producto = ''"))
 
         if insp.has_table("pedidos_internacionales"):
             con.execute(text("UPDATE pedidos_internacionales SET llega_click_mail = 'Si' WHERE fecha_click_mail IS NOT NULL AND (llega_click_mail IS NULL OR llega_click_mail = '')"))
             con.execute(text("UPDATE pedidos_internacionales SET llega_click_mail = 'No' WHERE llega_click_mail IS NULL OR llega_click_mail = ''"))
+
+        if insp.has_table("pedidos") and insp.has_table("pedido_documentos"):
+            filas_docs = con.execute(
+                text("SELECT id, documentacion_archivo, documentacion_drive_link FROM pedidos WHERE documentacion_archivo IS NOT NULL AND documentacion_archivo != ''")
+            ).fetchall()
+            for pid, doc_arch, doc_link in filas_docs:
+                existentes_doc = {
+                    r[0] for r in con.execute(
+                        text("SELECT nombre_archivo FROM pedido_documentos WHERE pedido_id = :pid"),
+                        {"pid": pid}
+                    ).fetchall()
+                }
+                for nombre_ind in [x.strip() for x in (doc_arch or "").split("|") if x.strip()]:
+                    if nombre_ind not in existentes_doc:
+                        con.execute(
+                            text("INSERT INTO pedido_documentos (pedido_id, nombre_archivo, drive_file_id, drive_link) VALUES (:pid, :nom, '', :lnk)"),
+                            {"pid": pid, "nom": nombre_ind, "lnk": doc_link or ""}
+                        )
 
 
 def inicializar_admin_y_correo():
@@ -342,7 +488,6 @@ def inicializar_admin_y_correo():
 
     db = SessionLocal()
     try:
-        # 1. Administrador General
         n_norm = models.normalizar(NOMBRE_ADMIN)
         admin = db.query(models.Asesor).filter(func.lower(models.Asesor.username) == "admin").first()
         if not admin:
@@ -366,7 +511,6 @@ def inicializar_admin_y_correo():
         db.commit()
         db.refresh(admin)
 
-        # 2. Leonardo Garzón (Jefe de área)
         leo_norm = models.normalizar("Leonardo Garzón")
         leonardo = db.query(models.Asesor).filter(
             or_(models.Asesor.username == "lgarzon", models.Asesor.nombre_norm == leo_norm)
@@ -392,7 +536,6 @@ def inicializar_admin_y_correo():
         db.commit()
         db.refresh(leonardo)
 
-        # 3. Miguel Mosquera (Asesor)
         miguel_norm = models.normalizar("Miguel Mosquera")
         miguel = db.query(models.Asesor).filter(
             or_(models.Asesor.username == "mmosquera", models.Asesor.nombre_norm == miguel_norm)
@@ -417,7 +560,6 @@ def inicializar_admin_y_correo():
             miguel.password_hash = hash_clave("Colombia2024*")
         db.commit()
 
-        # 4. Carlos Mendoza (Asesor)
         carlos_norm = models.normalizar("Carlos Mendoza")
         carlos = db.query(models.Asesor).filter(
             or_(models.Asesor.username == "cmendoza", models.Asesor.nombre_norm == carlos_norm)
@@ -442,7 +584,6 @@ def inicializar_admin_y_correo():
             carlos.password_hash = hash_clave("Colombia2024*")
         db.commit()
 
-        # Limpiar cuentas antiguas de prueba si existen y pasar sus POs a Leonardo Garzón
         for old_u in db.query(models.Asesor).filter(models.Asesor.username.in_(["qa_tester", "asesor_qa"])).all():
             db.query(models.Pedido).filter(models.Pedido.asesor_id == old_u.id).update(
                 {"asesor_id": leonardo.id}, synchronize_session=False
@@ -538,6 +679,7 @@ def render(request: Request, nombre: str, ctx: dict | None = None, status: int =
     ctx.setdefault("flash", request.session.pop("flash", None))
     ctx["request"] = request
     ctx["roles_superiores"] = ROLES_SUPERIORES
+    ctx["roles_gerencia_admin"] = ROLES_GERENCIA_ADMIN
     return templates.TemplateResponse(request=request, name=nombre, context=ctx, status_code=status)
 
 
@@ -650,16 +792,21 @@ def enviar_correo(destino: str, asunto: str, cuerpo: str) -> bool:
 def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
     info_dias = p.dias_habiles_info
     estado_semaforo = "VENCIDO / RETRASADO" if info_dias["en_contra"] else "EN TIEMPO"
+    moneda = p.moneda
     asunto = f"[Fly Logistic S.A.S.] Seguimiento {info_dias['etiqueta']} - Cliente: {p.cliente.nombre}"
 
     lineas_items = []
     for idx, it in enumerate(p.items, start=1):
         alt_txt = f" (Alterno: {it.parte_numero_alterno})" if it.parte_numero_alterno else ""
         est_prod = it.estado_producto or "PENDIENTE"
+        imp_txt = "EXENTO (0%)" if it.es_exento_iva else f"{Decimal(str(it.iva_porcentaje)):g}%"
+        adicionales_txt = ""
+        if it.cobro_hazmat_dec > 0 or it.cobro_certificado_dec > 0:
+            adicionales_txt = f" | Hazmat: ${it.cobro_hazmat_dec:,.2f} | Cert.: ${it.cobro_certificado_dec:,.2f}"
         lineas_items.append(
             f"  {idx}. [{est_prod}] Part Number: {it.parte_numero}{alt_txt} | {it.descripcion} | "
-            f"Cant: {it.cantidad} {it.unidad_medida} | Unit: ${Decimal(str(it.precio_unitario)):,.2f} | "
-            f"Impuesto: {Decimal(str(it.iva_porcentaje)):g}% | Total Línea: ${it.total_item:,.2f}"
+            f"Cant: {it.cantidad} {it.unidad_medida} | Unit ({moneda}): ${Decimal(str(it.precio_unitario)):,.2f}"
+            f"{adicionales_txt} | Impuesto: {imp_txt} | Total Línea ({moneda}): ${it.total_item:,.2f}"
         )
 
     intl_txt = ""
@@ -675,7 +822,7 @@ def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
             f"- Tracking: {(i.tracking if i and i.tracking else 'Sin asignar')}\n"
             f"- Estado de Nacionalización: {est_nac}\n"
             f"- Fecha de Nacionalización: {fecha_nac}\n"
-            f"- Costo de Nacionalización: ${p.valor_nacionalizacion_dec:,.2f}\n"
+            f"- Costo de Nacionalización (USD): ${p.valor_nacionalizacion_dec:,.2f}\n"
         )
 
     cuerpo = (
@@ -683,7 +830,7 @@ def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
         f"Se adjunta el resumen operativo de la Orden de Compra {p.po_codigo}:\n\n"
         f"- Orden de Compra: {p.po_codigo}\n"
         f"- Cliente: {p.cliente.nombre}\n"
-        f"- Operación: {p.tipo}\n"
+        f"- Operación: {p.tipo} ({moneda})\n"
         f"- Estado General: {p.estado}\n"
         f"- Fecha de Inicio: {p.fecha_inicial.isoformat()}\n"
         f"- Fecha Prometida: {p.plazo_entrega.isoformat() if p.plazo_entrega else 'Sin definir'}\n"
@@ -692,12 +839,42 @@ def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
         f"{intl_txt}\n"
         f"DETALLE DE ÍTEMS\n"
         + "\n".join(lineas_items) +
-        f"\n\nTOTALES DE LA ORDEN\n"
-        f"- Subtotal: ${p.subtotal:,.2f}\n"
+        f"\n\nTOTALES DE LA ORDEN ({moneda})\n"
+        f"- Subtotal (incl. Hazmat y Certificados): ${p.subtotal:,.2f}\n"
         f"- Impuestos: ${p.total_impuestos:,.2f}\n"
         f"- Nacionalización: ${p.valor_nacionalizacion_dec:,.2f}\n"
-        f"- Total General: ${p.total:,.2f}\n\n"
+        f"- Total General ({moneda}): ${p.total:,.2f}\n\n"
         f"Fly Logistic S.A.S."
+    )
+    return asunto, cuerpo
+
+
+def construir_cuerpo_consolidado_faltantes(pedidos: list[models.Pedido]) -> tuple[str, str]:
+    asunto = f"[Fly Logistic S.A.S.] Reporte Consolidado de Faltantes de Compra ({date.today().isoformat()})"
+    lineas = []
+    total_faltantes = 0
+    for p in pedidos:
+        moneda = p.moneda
+        for it in p.items:
+            if not it.fecha_compra_proveedor or it.estado_producto == "PENDIENTE":
+                total_faltantes += 1
+                lineas.append(
+                    f"- PO: {p.po_codigo} ({p.tipo}) | Asesor: {p.asesor.nombre if p.asesor else 'N/A'} | "
+                    f"Cliente: {p.cliente.nombre if p.cliente else 'N/A'} | "
+                    f"SKU: {it.parte_numero} | Desc: {it.descripcion} | "
+                    f"Prov: {it.proveedor} | Cant: {it.cantidad} {it.unidad_medida} | "
+                    f"Subtotal ({moneda}): ${it.subtotal_item:,.2f} | Estado: {it.estado_producto}"
+                )
+
+    if not lineas:
+        lineas.append("No se registran ítems pendientes de compra a proveedor en este momento.")
+
+    cuerpo = (
+        f"REPORTE EJECUTIVO CONSOLIDADO DE ÍTEMS Y COMPRAS FALTANTES\n"
+        f"Fecha de corte: {datetime.now(BOGOTA_TZ).strftime('%Y-%m-%d %H:%M')}\n"
+        f"Total de ítems pendientes de compra / despacho: {total_faltantes}\n\n"
+        + "\n".join(lineas) +
+        "\n\nFly Logistic S.A.S. - Command Center OMS"
     )
     return asunto, cuerpo
 
@@ -710,7 +887,8 @@ CAMPOS = [
 ]
 CAMPOS_ITEM = [
     "fecha_compra_prov", "proveedor", "parte_numero", "parte_numero_alterno",
-    "unidad_medida", "descripcion", "cantidad", "precio_unitario", "iva_item", "estado_producto"
+    "unidad_medida", "descripcion", "cantidad", "precio_unitario",
+    "cobro_hazmat", "cobro_certificado", "sin_iva", "iva_item", "estado_producto"
 ]
 
 
@@ -738,7 +916,16 @@ def datos_desde_form(f) -> dict:
             if idx < len(vals):
                 fila_dict[k] = vals[idx]
             else:
-                fila_dict[k] = "PENDIENTE" if k == "estado_producto" else ("UND" if k == "unidad_medida" else "")
+                if k == "estado_producto":
+                    fila_dict[k] = "PENDIENTE"
+                elif k == "unidad_medida":
+                    fila_dict[k] = "UND"
+                elif k in ("cobro_hazmat", "cobro_certificado"):
+                    fila_dict[k] = "0.00"
+                elif k == "sin_iva":
+                    fila_dict[k] = "0"
+                else:
+                    fila_dict[k] = ""
         if any(fila_dict.get(c) for c in ("proveedor", "parte_numero", "descripcion", "precio_unitario")):
             items.append(fila_dict)
     d["items"] = items
@@ -754,6 +941,7 @@ def datos_desde_pedido(p: models.Pedido) -> dict:
         "po_numero": p.po,
         "cliente": p.cliente.nombre,
         "tipo_pedido": p.tipo,
+        "moneda": p.moneda,
         "metodo_pago": p.metodo_pago or "",
         "iva_porcentaje": f"{Decimal(str(p.iva_porcentaje)):g}",
         "valor_nacionalizacion": f"{Decimal(str(p.valor_nacionalizacion or 0)):.2f}",
@@ -768,6 +956,14 @@ def datos_desde_pedido(p: models.Pedido) -> dict:
         "documentacion": p.documentacion or "",
         "documentacion_archivo": p.documentacion_archivo or "",
         "documentacion_drive_link": p.documentacion_drive_link or "",
+        "documentos_adjuntos": [
+            {
+                "id": doc.id,
+                "nombre_archivo": doc.nombre_archivo,
+                "drive_link": doc.drive_link or ""
+            }
+            for doc in p.lista_documentos
+        ],
         "estado_general": p.estado,
         "observaciones": p.observaciones or "",
         "asesor_asignado_id": str(p.asesor_id),
@@ -780,7 +976,10 @@ def datos_desde_pedido(p: models.Pedido) -> dict:
             "descripcion": it.descripcion,
             "cantidad": str(it.cantidad),
             "precio_unitario": f"{Decimal(str(it.precio_unitario)):.2f}",
-            "iva_item": f"{Decimal(str(it.iva_porcentaje if it.iva_porcentaje is not None else p.iva_porcentaje)):g}",
+            "cobro_hazmat": f"{Decimal(str(getattr(it, 'cobro_hazmat', 0) or 0)):.2f}",
+            "cobro_certificado": f"{Decimal(str(getattr(it, 'cobro_certificado', 0) or 0)):.2f}",
+            "sin_iva": "1" if (getattr(it, "sin_iva", 0) or Decimal(str(it.iva_porcentaje or 0)) == 0) else "0",
+            "iva_item": "0" if (getattr(it, "sin_iva", 0) or Decimal(str(it.iva_porcentaje or 0)) == 0) else f"{Decimal(str(it.iva_porcentaje if it.iva_porcentaje is not None else p.iva_porcentaje)):g}",
             "estado_producto": it.estado_producto or "PENDIENTE",
         } for it in p.items],
     }
@@ -823,7 +1022,11 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
         raise ValueError("Seleccione al menos un método de pago.")
 
     iva_defecto = "19" if tipo == "Nacional" else "7"
-    iva_cabecera = _decimal(d.get("iva_porcentaje") or iva_defecto, "IVA / TAX")
+    iva_cab_raw = (d.get("iva_porcentaje") or "").strip().lower()
+    if iva_cab_raw in ("exento", "sin_iva", "sin iva", "0", "0.0"):
+        iva_cabecera = Decimal("0")
+    else:
+        iva_cabecera = _decimal(d.get("iva_porcentaje") or iva_defecto, "IVA / TAX")
     if not 0 <= iva_cabecera <= 100:
         raise ValueError("El porcentaje de impuesto debe estar entre 0 y 100.")
 
@@ -853,10 +1056,27 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
         if precio <= 0:
             raise ValueError(f"Ítem {n}: el precio unitario debe ser mayor a 0.")
 
-        iva_it_txt = it.get("iva_item")
-        iva_it = _decimal(iva_it_txt if iva_it_txt != "" else str(iva_cabecera), f"impuesto del ítem {n}")
-        if not 0 <= iva_it <= 100:
-            raise ValueError(f"Ítem {n}: el impuesto debe estar entre 0 y 100.")
+        hazmat_txt = (it.get("cobro_hazmat") or "0").strip() or "0"
+        cobro_hazmat = _decimal(hazmat_txt, f"cobro Hazmat del ítem {n}")
+        if cobro_hazmat < 0:
+            raise ValueError(f"Ítem {n}: el cobro Hazmat no puede ser negativo.")
+
+        cert_txt = (it.get("cobro_certificado") or "0").strip() or "0"
+        cobro_certificado = _decimal(cert_txt, f"cobro Certificado del ítem {n}")
+        if cobro_certificado < 0:
+            raise ValueError(f"Ítem {n}: el cobro Certificado no puede ser negativo.")
+
+        sin_iva_flag = str(it.get("sin_iva") or "").strip().lower() in ("1", "true", "si", "sí", "on", "exento", "sin_iva")
+        iva_it_txt = str(it.get("iva_item") if it.get("iva_item") is not None else "").strip().lower()
+
+        if sin_iva_flag or iva_it_txt in ("0", "0.0", "0.00", "exento", "sin_iva", "sin iva"):
+            iva_it = Decimal("0")
+            es_sin_iva = 1
+        else:
+            iva_it = _decimal(iva_it_txt if iva_it_txt != "" else str(iva_cabecera), f"impuesto del ítem {n}")
+            if not 0 <= iva_it <= 100:
+                raise ValueError(f"Ítem {n}: el impuesto debe estar entre 0 y 100.")
+            es_sin_iva = 1 if iva_it == Decimal("0") else 0
 
         est_prod = (it.get("estado_producto") or "PENDIENTE").strip().upper()
         if est_prod not in ESTADOS_PRODUCTO:
@@ -871,6 +1091,9 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
             "descripcion": it["descripcion"].strip(),
             "cantidad": cant,
             "precio_unitario": precio,
+            "cobro_hazmat": cobro_hazmat,
+            "cobro_certificado": cobro_certificado,
+            "sin_iva": es_sin_iva,
             "iva_porcentaje": iva_it,
             "estado_producto": est_prod,
         })
@@ -925,6 +1148,7 @@ def obtener_o_crear_cliente(db: Session, nombre_raw: str) -> models.Cliente:
 def aplicar(db: Session, pedido: models.Pedido, v: dict):
     cli = obtener_o_crear_cliente(db, v["cliente"])
     pedido.cliente_id = cli.id
+    pedido.tipo = v["tipo"]
     for k in ("fecha_inicial", "metodo_pago", "iva_porcentaje", "valor_nacionalizacion", "plazo_entrega",
               "fecha_entrega_cliente", "numero_remision", "documentacion", "estado", "observaciones"):
         setattr(pedido, k, v[k])
@@ -949,11 +1173,54 @@ def pedido_del_usuario(db: Session, pid: int, user: models.Asesor) -> models.Ped
         joinedload(models.Pedido.items),
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.asesor),
-        joinedload(models.Pedido.internacional)
+        joinedload(models.Pedido.internacional),
+        joinedload(models.Pedido.documentos)
     ).filter(models.Pedido.id == pid)
     if visibles is not None:
         q = q.filter(models.Pedido.asesor_id.in_(visibles))
     return q.first()
+
+
+@app.get("/pedidos/consolidado/excel")
+def descargar_consolidado_individual(asesor_id: str = "", user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    visibles = ids_asesores_visibles(db, user)
+    objetivo_user = user
+
+    if user.rol in ROLES_SUPERIORES and asesor_id.isdigit():
+        cand = db.get(models.Asesor, int(asesor_id))
+        if cand and (visibles is None or cand.id in visibles):
+            objetivo_user = cand
+
+    q_ped = db.query(models.Pedido).options(
+        joinedload(models.Pedido.items),
+        joinedload(models.Pedido.cliente),
+        joinedload(models.Pedido.asesor),
+        joinedload(models.Pedido.internacional),
+        joinedload(models.Pedido.documentos)
+    )
+
+    if asesor_id.lower() == "todos" and user.rol in ROLES_SUPERIORES:
+        if visibles is not None:
+            q_ped = q_ped.filter(models.Pedido.asesor_id.in_(visibles))
+        pedidos_usuario = q_ped.all()
+        nombre_arch = "Consolidado_POs_Equipo_Global.xlsx"
+        ruta_cons = os.path.join(BASE_DIR, "Consolidados_Usuarios", nombre_arch)
+        generar_excel_consolidado_usuario(ruta_cons, pedidos_usuario, "Equipo Global")
+        return FileResponse(ruta_cons, filename=nombre_arch, media_type=XLSX_MIME)
+    else:
+        if user.rol in ROLES_SUPERIORES and asesor_id.isdigit():
+            q_ped = q_ped.filter(models.Pedido.asesor_id == objetivo_user.id)
+        else:
+            q_ped = q_ped.filter(models.Pedido.asesor_id == user.id)
+            objetivo_user = user
+
+        pedidos_usuario = q_ped.all()
+        carpeta_cons = os.path.join(BASE_DIR, "Consolidados_Usuarios")
+        os.makedirs(carpeta_cons, exist_ok=True)
+        nombre_arch = f"Consolidado_POs_{nombre_seguro(objetivo_user.nombre)}.xlsx"
+        ruta_cons = os.path.join(carpeta_cons, nombre_arch)
+        generar_excel_consolidado_usuario(ruta_cons, pedidos_usuario, objetivo_user.nombre)
+        return FileResponse(ruta_cons, filename=nombre_arch, media_type=XLSX_MIME)
 
 
 @app.api_route("/healthz", methods=["GET", "HEAD"])
@@ -1385,7 +1652,8 @@ def vista_supervision(request: Request, asesor_id: str = "", q: str = "",
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.asesor),
         joinedload(models.Pedido.items),
-        joinedload(models.Pedido.internacional)
+        joinedload(models.Pedido.internacional),
+        joinedload(models.Pedido.documentos)
     )
     if visibles is not None:
         q_pedidos = q_pedidos.filter(models.Pedido.asesor_id.in_(visibles))
@@ -1456,7 +1724,8 @@ async def reasignar_po_supervision(request: Request, user: models.Asesor = Depen
             joinedload(models.Pedido.items),
             joinedload(models.Pedido.cliente),
             joinedload(models.Pedido.asesor),
-            joinedload(models.Pedido.internacional)
+            joinedload(models.Pedido.internacional),
+            joinedload(models.Pedido.documentos)
         ).filter(models.Pedido.asesor_id == asesor_origen.id).all()
 
         cantidad_movida = len(pedidos_mover)
@@ -1510,7 +1779,8 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
         joinedload(models.Pedido.items),
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.asesor),
-        joinedload(models.Pedido.internacional)
+        joinedload(models.Pedido.internacional),
+        joinedload(models.Pedido.documentos)
     )
     if visibles is not None:
         q_pedidos = q_pedidos.filter(models.Pedido.asesor_id.in_(visibles))
@@ -1608,6 +1878,7 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
                 "pedido_id": p.id,
                 "po": p.po_codigo,
                 "tipo": p.tipo,
+                "moneda": p.moneda,
                 "asesor": p.asesor.nombre if p.asesor else "",
                 "cliente": cli_nom,
                 "proveedor": prov_nom,
@@ -1617,6 +1888,12 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
                 "descripcion": it.descripcion,
                 "cantidad": it.cantidad,
                 "unidad_medida": it.unidad_medida or "UND",
+                "precio_unitario": float(it.precio_unitario or 0),
+                "cobro_hazmat": float(it.cobro_hazmat_dec),
+                "cobro_certificado": float(it.cobro_certificado_dec),
+                "subtotal_item": float(it.subtotal_item),
+                "iva_porcentaje": 0.0 if it.es_exento_iva else float(it.iva_porcentaje or 0),
+                "total_item": float(it.total_item),
                 "estado_producto": it.estado_producto or "PENDIENTE",
                 "estado_po": p.estado,
                 "semaforo": info_habiles["etiqueta"],
@@ -1630,6 +1907,7 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
                 "asesor": p.asesor.nombre if p.asesor else "",
                 "asesor_email": (p.asesor.email if p.asesor and p.asesor.email else CORREO_OFICIAL),
                 "tipo": p.tipo,
+                "moneda": p.moneda,
                 "estado": p.estado,
                 "dias": dias_gest,
                 "plazo": p.plazo_entrega.isoformat() if p.plazo_entrega else "Sin definir",
@@ -1739,14 +2017,17 @@ def descargar_informe_gerencial(asesor_id: str = "", tipo: str = "", desde: str 
 
     ws1 = wb.active
     ws1.title = "Metricas_Asesores"
-    ws1.merge_cells("A1:K1")
+    ws1.merge_cells("A1:M1")
     ws1["A1"] = "INFORME GERENCIAL DE DESEMPEÑO E INDICADORES OPERATIVOS - FLY LOGISTIC S.A.S."
     ws1["A1"].font = Font(bold=True, size=14, color="FFFFFF")
     ws1["A1"].fill = PatternFill("solid", fgColor="002060")
     ws1["A1"].alignment = Alignment(horizontal="center", vertical="center")
 
-    enc1 = ["Asesor", "Cargo", "Superior", "Total POs", "Entregadas", "En Proceso",
-            "Ítems Sin Compra", "Tiempo Prom. (Días)", "Cumplimiento (%)", "Nacionalización ($)", "Volumen Total ($)"]
+    enc1 = [
+        "Asesor", "Cargo", "Superior", "Total POs", "Entregadas", "En Proceso",
+        "Ítems Sin Compra", "Tiempo Prom. (Días)", "% Cumplimiento SLA",
+        "Nivel de Desempeño", "Avance Ponderado (%)", "Nacionalización ($)", "Volumen Total ($)"
+    ]
     ws1.append(enc1)
     for c in ws1[2]:
         c.font = Font(bold=True, color="FFFFFF")
@@ -1756,43 +2037,54 @@ def descargar_informe_gerencial(asesor_id: str = "", tipo: str = "", desde: str 
         ws1.append([
             a["nombre"], a["rol"], a["jefe"], a["total_pos"], a["entregados"],
             a["pendientes"], a["items_pendientes_compra"], a["tiempo_promedio"],
-            a["probabilidad"], a["nacionalizacion"], a["volumen"]
+            a["sla_pct"], a["nivel"], a["probabilidad"], a["nacionalizacion"], a["volumen"]
         ])
-    for i in range(1, 12):
-        ws1.column_dimensions[get_column_letter(i)].width = 20
+    for i in range(1, len(enc1) + 1):
+        ws1.column_dimensions[get_column_letter(i)].width = 22
 
     ws2 = wb.create_sheet("Seguimiento_POs")
-    enc2 = ["PO", "Cliente", "Asesor", "Operación", "Estado", "Indicador Plazo",
-            "Fecha Prometida", "Ítems Pendientes", "Nacionalización ($)", "Avance (%)", "Total PO ($)"]
+    enc2 = [
+        "PO", "Cliente", "Asesor", "Operación", "Moneda", "Estado", "Indicador Plazo (Semáforo)",
+        "Fecha Prometida", "Ítems Pendientes", "Nacionalización ($)", "Avance (%)", "Total PO ($)"
+    ]
     ws2.append(enc2)
     for c in ws2[1]:
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor="002060")
 
-    for cp in ctx["compras_pendientes_po"]:
+    for idx_row, cp in enumerate(ctx["compras_pendientes_po"], start=2):
         ws2.append([
-            cp["po"], cp["cliente"], cp["asesor"], cp["tipo"], cp["estado"],
+            cp["po"], cp["cliente"], cp["asesor"], cp["tipo"], cp["moneda"], cp["estado"],
             cp["dias_habiles_info"]["etiqueta"], cp["plazo"], cp["items_pendientes"],
             cp["valor_nacionalizacion"], cp["probabilidad"], cp["total"]
         ])
-    for i in range(1, 12):
+        color_sem = "FEE2E2" if cp["dias_habiles_info"]["en_contra"] else "DCFCE7"
+        ws2[f"G{idx_row}"].fill = PatternFill("solid", fgColor=color_sem)
+    for i in range(1, len(enc2) + 1):
         ws2.column_dimensions[get_column_letter(i)].width = 22
 
     ws3 = wb.create_sheet("Detalle_Global_Items")
-    enc3 = ["PO", "Operación", "Asesor", "Cliente", "Proveedor", "Fecha Compra", "¿Comprado?",
-            "Part Number", "Descripción", "Cantidad", "Unidad", "Estado Ítem", "Estado PO", "Indicador Plazo"]
+    enc3 = [
+        "PO", "Operación", "Moneda", "Asesor", "Cliente", "Proveedor", "Fecha Compra", "¿Comprado?",
+        "Part Number", "Descripción", "Cantidad", "Unidad", "Precio Unit.", "Cobro Hazmat",
+        "Cobro Certificado", "Subtotal Ítem", "IVA / TAX (%)", "Total Ítem", "Estado Ítem", "Estado PO", "Indicador Plazo"
+    ]
     ws3.append(enc3)
     for c in ws3[1]:
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor="002060")
-    for it_g in ctx["todos_items_global"]:
+    for idx_it, it_g in enumerate(ctx["todos_items_global"], start=2):
         ws3.append([
-            it_g["po"], it_g["tipo"], it_g["asesor"], it_g["cliente"], it_g["proveedor"],
-            it_g["fecha_compra"], "SÍ" if it_g["comprado"] else "PENDIENTE",
+            it_g["po"], it_g["tipo"], it_g["moneda"], it_g["asesor"], it_g["cliente"], it_g["proveedor"],
+            it_g["fecha_compra"], "SÍ" if it_g["comprado"] else "FALTA COMPRAR",
             it_g["parte_numero"], it_g["descripcion"], it_g["cantidad"], it_g["unidad_medida"],
+            it_g["precio_unitario"], it_g["cobro_hazmat"], it_g["cobro_certificado"],
+            it_g["subtotal_item"], it_g["iva_porcentaje"], it_g["total_item"],
             it_g["estado_producto"], it_g["estado_po"], it_g["semaforo"]
         ])
-    for i in range(1, 15):
+        color_c = "DCFCE7" if it_g["comprado"] else "FEE2E2"
+        ws3[f"H{idx_it}"].fill = PatternFill("solid", fgColor=color_c)
+    for i in range(1, len(enc3) + 1):
         ws3.column_dimensions[get_column_letter(i)].width = 22
 
     carpeta_rep = os.path.join(BASE_DIR, "Reportes_Gerenciales")
@@ -1813,7 +2105,8 @@ def descargar_excel_maestro_productos(asesor_id: str = "", tipo: str = "", estad
         joinedload(models.Pedido.items),
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.asesor),
-        joinedload(models.Pedido.internacional)
+        joinedload(models.Pedido.internacional),
+        joinedload(models.Pedido.documentos)
     )
     if visibles is not None:
         q_ped = q_ped.filter(models.Pedido.asesor_id.in_(visibles))
@@ -1832,32 +2125,6 @@ def descargar_excel_maestro_productos(asesor_id: str = "", tipo: str = "", estad
     return FileResponse(ruta_rep, filename="Control_Maestro_Productos_PO_FlyLogistic.xlsx", media_type=XLSX_MIME)
 
 
-@app.get("/pedidos/consolidado/excel")
-def descargar_consolidado_individual(asesor_id: str = "", user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
-    visibles = ids_asesores_visibles(db, user)
-    objetivo_user = user
-
-    if user.rol in ROLES_SUPERIORES and asesor_id.isdigit():
-        cand = db.get(models.Asesor, int(asesor_id))
-        if cand and (visibles is None or cand.id in visibles):
-            objetivo_user = cand
-
-    q_ped = db.query(models.Pedido).options(
-        joinedload(models.Pedido.items),
-        joinedload(models.Pedido.cliente),
-        joinedload(models.Pedido.asesor),
-        joinedload(models.Pedido.internacional)
-    ).filter(models.Pedido.asesor_id == objetivo_user.id)
-
-    pedidos_usuario = q_ped.all()
-    carpeta_cons = os.path.join(BASE_DIR, "Consolidados_Usuarios")
-    os.makedirs(carpeta_cons, exist_ok=True)
-    nombre_arch = f"Consolidado_POs_{nombre_seguro(objetivo_user.nombre)}.xlsx"
-    ruta_cons = os.path.join(carpeta_cons, nombre_arch)
-    generar_excel_consolidado_usuario(ruta_cons, pedidos_usuario, objetivo_user.nombre)
-    return FileResponse(ruta_cons, filename=nombre_arch, media_type=XLSX_MIME)
-
-
 @app.get("/pedidos", response_class=HTMLResponse)
 def mis_pedidos(request: Request, q: str = "", po: str = "", cliente: str = "", proveedor: str = "",
                 asesor_id: str = "", estado: str = "", tipo: str = "", estado_producto: str = "",
@@ -1868,14 +2135,35 @@ def mis_pedidos(request: Request, q: str = "", po: str = "", cliente: str = "", 
                  joinedload(models.Pedido.items),
                  joinedload(models.Pedido.cliente),
                  joinedload(models.Pedido.asesor),
-                 joinedload(models.Pedido.internacional)
+                 joinedload(models.Pedido.internacional),
+                 joinedload(models.Pedido.documentos)
              )
              .join(models.Cliente))
 
     if visibles is not None:
         query = query.filter(models.Pedido.asesor_id.in_(visibles))
-    if user.rol in ROLES_SUPERIORES and asesor_id.isdigit():
-        query = query.filter(models.Pedido.asesor_id == int(asesor_id))
+
+    asesor_f_limpio = (asesor_id or "").strip()
+    if asesor_f_limpio == "":
+        query = query.filter(models.Pedido.asesor_id == user.id)
+        asesor_f_activo = str(user.id)
+    elif asesor_f_limpio.lower() in ("todos", "all", "0"):
+        if user.rol in ROLES_SUPERIORES:
+            asesor_f_activo = "todos"
+        else:
+            query = query.filter(models.Pedido.asesor_id == user.id)
+            asesor_f_activo = str(user.id)
+    elif asesor_f_limpio.isdigit():
+        if user.rol in ROLES_SUPERIORES:
+            query = query.filter(models.Pedido.asesor_id == int(asesor_f_limpio))
+            asesor_f_activo = asesor_f_limpio
+        else:
+            query = query.filter(models.Pedido.asesor_id == user.id)
+            asesor_f_activo = str(user.id)
+    else:
+        query = query.filter(models.Pedido.asesor_id == user.id)
+        asesor_f_activo = str(user.id)
+
     if estado in ESTADOS:
         query = query.filter(models.Pedido.estado == estado)
     if tipo in ("Nacional", "Internacional"):
@@ -1937,7 +2225,7 @@ def mis_pedidos(request: Request, q: str = "", po: str = "", cliente: str = "", 
         "po_f": po,
         "cliente_f": cliente,
         "proveedor_f": proveedor,
-        "asesor_f": asesor_id,
+        "asesor_f": asesor_f_activo,
         "estado_f": estado,
         "tipo_f": tipo,
         "estado_prod_f": estado_producto,
@@ -2014,6 +2302,53 @@ def notificar_pos_proximas(request: Request, tareas: BackgroundTasks,
     return RedirectResponse("/pedidos", status_code=303)
 
 
+@app.post("/pedidos/notificar_faltantes")
+def notificar_consolidado_faltantes(request: Request,
+                                    user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    if user.rol not in ROLES_GERENCIA_ADMIN:
+        request.session["flash"] = {
+            "ok": False,
+            "msg": "El envío del Reporte Consolidado de Faltantes está restringido a Gerencia y Administradores."
+        }
+        return RedirectResponse("/pedidos", status_code=303)
+
+    pedidos = db.query(models.Pedido).options(
+        joinedload(models.Pedido.items),
+        joinedload(models.Pedido.cliente),
+        joinedload(models.Pedido.asesor)
+    ).filter(models.Pedido.estado != "Entregado").all()
+
+    destino = user.email or CORREO_OFICIAL
+    asunto, cuerpo = construir_cuerpo_consolidado_faltantes(pedidos)
+    ok, detalle = enviar_correo_con_diagnostico(destino, asunto, cuerpo)
+    if ok:
+        request.session["flash"] = {
+            "ok": True,
+            "msg": f"Reporte Consolidado de Faltantes enviado a {destino}."
+        }
+    else:
+        request.session["flash"] = {
+            "ok": False,
+            "msg": f"Aviso SMTP al enviar Consolidado de Faltantes: {detalle[:90]}"
+        }
+    return RedirectResponse("/pedidos", status_code=303)
+
+
+@app.post("/pedidos/selector_correos")
+async def selector_correos_post(request: Request, tareas: BackgroundTasks,
+                                user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    f = await request.form()
+    tipo_correo = (f.get("tipo_correo") or "").strip()
+    pedido_id_str = (f.get("pedido_id") or "").strip()
+
+    if tipo_correo == "consolidado_faltantes":
+        return notificar_consolidado_faltantes(request, user, db)
+    elif tipo_correo == "individual_po" and pedido_id_str.isdigit():
+        return notificar_po_responsable(int(pedido_id_str), request, user, db)
+    else:
+        return notificar_pos_proximas(request, tareas, user, db)
+
+
 @app.get("/api/validar_po")
 def api_validar_po(po: str = "", excluir_id: int = 0, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
     po_limpio = po.strip()
@@ -2060,27 +2395,36 @@ def _form(request, db: Session, user: models.Asesor, d, modo, pedido=None, error
         "asesores_disponibles": asesores_disponibles,
         "siguiente_po_sugerida": sugerir_siguiente_po(db),
         "pos_existentes": pos_existentes,
+        "max_archivos_po": MAX_ARCHIVOS_PO,
     }, status)
 
 
 @app.get("/pedidos/nuevo", response_class=HTMLResponse)
 def nuevo_form(request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
-    hoy = datetime.now().strftime("%Y-%m-%d")
+    permitido, msg_horario = validar_horario_asesor(user)
+    if not permitido:
+        request.session["flash"] = {"ok": False, "msg": msg_horario}
+        return RedirectResponse("/pedidos", status_code=303)
+
+    hoy = datetime.now(BOGOTA_TZ).strftime("%Y-%m-%d")
     sugerida = sugerir_siguiente_po(db)
     d = {k: "" for k in CAMPOS}
     d.update(
         fecha_inicial=hoy,
         po_numero=sugerida,
         tipo_pedido="Nacional",
+        moneda="COP",
         iva_porcentaje="19",
         valor_nacionalizacion="0.00",
         llega_click_mail="No",
         estado_general="En proceso",
         asesor_asignado_id=str(user.id),
+        documentos_adjuntos=[],
         items=[{
             "fecha_compra_prov": "", "proveedor": "", "parte_numero": "",
             "parte_numero_alterno": "", "unidad_medida": "UND", "descripcion": "",
-            "cantidad": "1", "precio_unitario": "", "iva_item": "19",
+            "cantidad": "1", "precio_unitario": "", "cobro_hazmat": "0.00",
+            "cobro_certificado": "0.00", "sin_iva": "0", "iva_item": "19",
             "estado_producto": "PENDIENTE"
         }]
     )
@@ -2090,53 +2434,86 @@ def nuevo_form(request: Request, user: models.Asesor = Depends(usuario_actual), 
 @app.post("/pedidos/nuevo", response_class=HTMLResponse)
 async def nuevo_post(request: Request, tareas: BackgroundTasks,
                      user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    permitido, msg_horario = validar_horario_asesor(user)
+    if not permitido:
+        request.session["flash"] = {"ok": False, "msg": msg_horario}
+        return RedirectResponse("/pedidos", status_code=303)
+
     form_raw = await request.form()
     d = datos_desde_form(form_raw)
-    archivo_doc = form_raw.get("archivo_documentacion")
+    archivos_subidos = (
+        list(form_raw.getlist("archivos_documentacion"))
+        + list(form_raw.getlist("archivo_documentacion"))
+    )
+    
+    pedido = None
+    rutas_docs = []
+    
     try:
         v = parsear(d)
-        existente_po = db.query(models.Pedido).filter(func.lower(models.Pedido.po) == v["po"].lower()).first()
-        if existente_po:
-            raise ValueError(
-                f"La orden «{v['po']}» ya se encuentra registrada ({existente_po.tipo}). "
-                f"Consecutivo disponible: {sugerir_siguiente_po(db)}"
-            )
+        
+        exito = False
+        for intento in range(3):
+            try:
+                if intento > 0:
+                    v["po"] = sugerir_siguiente_po(db)
+                
+                existente_po = db.query(models.Pedido).filter(func.lower(models.Pedido.po) == v["po"].lower()).first()
+                if existente_po and intento == 0:
+                    raise ValueError(
+                        f"La orden «{v['po']}» ya se encuentra registrada ({existente_po.tipo}). "
+                        f"Consecutivo disponible: {sugerir_siguiente_po(db)}"
+                    )
 
-        asesor_id_final = user.id
-        if user.rol in ROLES_SUPERIORES and d.get("asesor_asignado_id", "").isdigit():
-            asesor_id_final = int(d["asesor_asignado_id"])
+                asesor_id_final = user.id
+                if user.rol in ROLES_SUPERIORES and d.get("asesor_asignado_id", "").isdigit():
+                    asesor_id_final = int(d["asesor_asignado_id"])
 
-        pedido = models.Pedido(po=v["po"], tipo=v["tipo"], asesor_id=asesor_id_final)
-        aplicar(db, pedido, v)
-        db.add(pedido)
-        db.commit()
+                pedido = models.Pedido(po=v["po"], tipo=v["tipo"], asesor_id=asesor_id_final)
+                aplicar(db, pedido, v)
+                db.add(pedido)
+                db.flush()
+
+                rutas_docs = await guardar_archivos_documentacion_multiple(db, pedido, archivos_subidos)
+                db.commit()
+                exito = True
+                break
+            except IntegrityError:
+                db.rollback()
+                if intento == 2:
+                    raise ValueError("Conflicto de concurrencia: Múltiples usuarios registraron una PO de forma simultánea. Intente guardar de nuevo.")
+                continue
+
+        if not exito:
+            raise ValueError("No fue posible asignar un consecutivo único debido a la alta concurrencia. Intente de nuevo.")
+
     except ValueError as e:
         db.rollback()
         return _form(request, db, user, d, "nuevo", error=str(e), status=400)
-    except IntegrityError:
+    except Exception as e:
         db.rollback()
-        return _form(request, db, user, d, "nuevo", error="El número de PO ya se encuentra registrado.", status=400)
+        return _form(request, db, user, d, "nuevo", error=f"Error al procesar la orden: {e}", status=400)
 
     db.refresh(pedido)
-    ruta_doc = None
-    if isinstance(archivo_doc, UploadFile) and archivo_doc.filename:
-        ruta_doc = await guardar_archivo_documentacion(pedido, archivo_doc)
-        db.commit()
-        db.refresh(pedido)
-
-    estado = generar_salidas(db, pedido, ruta_doc)
+    ruta_doc_principal = rutas_docs[0] if rutas_docs else None
+    estado = generar_salidas(db, pedido, ruta_doc_principal, rutas_docs)
 
     if pedido.plazo_entrega:
         destino = (pedido.asesor.email if (pedido.asesor and pedido.asesor.email) else None) or CORREO_OFICIAL
         asunto, cuerpo = construir_cuerpo_alerta_po(pedido)
         tareas.add_task(enviar_correo, destino, asunto, cuerpo)
 
-    request.session["flash"] = {"ok": True, "msg": f"Orden {pedido.po_codigo} registrada. {estado}."}
+    request.session["flash"] = {"ok": True, "msg": f"Orden {pedido.po_codigo} registrada con éxito. {estado}."}
     return RedirectResponse("/pedidos", status_code=303)
 
 
 @app.get("/pedidos/{pid}/editar", response_class=HTMLResponse)
 def editar_form(pid: int, request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    permitido, msg_horario = validar_horario_asesor(user)
+    if not permitido:
+        request.session["flash"] = {"ok": False, "msg": msg_horario}
+        return RedirectResponse("/pedidos", status_code=303)
+
     pedido = pedido_del_usuario(db, pid, user)
     if not pedido:
         request.session["flash"] = {"ok": False, "msg": "Orden no encontrada o sin permisos de acceso."}
@@ -2147,47 +2524,140 @@ def editar_form(pid: int, request: Request, user: models.Asesor = Depends(usuari
 @app.post("/pedidos/{pid}/editar", response_class=HTMLResponse)
 async def editar_post(pid: int, request: Request,
                       user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    permitido, msg_horario = validar_horario_asesor(user)
+    if not permitido:
+        request.session["flash"] = {"ok": False, "msg": msg_horario}
+        return RedirectResponse("/pedidos", status_code=303)
+
     pedido = pedido_del_usuario(db, pid, user)
     if not pedido:
         request.session["flash"] = {"ok": False, "msg": "Orden no encontrada."}
         return RedirectResponse("/pedidos", status_code=303)
+
+    carpeta_anterior = carpeta_po_local(pedido)
     form_raw = await request.form()
     d = datos_desde_form(form_raw)
-    archivo_doc = form_raw.get("archivo_documentacion")
-    d["po_numero"], d["tipo_pedido"] = pedido.po, pedido.tipo
+    archivos_subidos = (
+        list(form_raw.getlist("archivos_documentacion"))
+        + list(form_raw.getlist("archivo_documentacion"))
+    )
+
+    d["po_numero"] = pedido.po
+    if not d.get("tipo_pedido") or d.get("tipo_pedido") not in ("Nacional", "Internacional"):
+        d["tipo_pedido"] = pedido.tipo
+
     try:
-        aplicar(db, pedido, parsear(d, tipo_fijo=pedido.tipo))
+        v = parsear(d, tipo_fijo=None)
+        aplicar(db, pedido, v)
         if user.rol in ROLES_SUPERIORES and d.get("asesor_asignado_id", "").isdigit():
             pedido.asesor_id = int(d["asesor_asignado_id"])
+
+        db.flush()
+        carpeta_nueva = carpeta_po_local(pedido)
+        if carpeta_anterior != carpeta_nueva and os.path.exists(carpeta_anterior):
+            for doc_existente in pedido.documentos:
+                origen_f = os.path.join(carpeta_anterior, doc_existente.nombre_archivo)
+                destino_f = os.path.join(carpeta_nueva, doc_existente.nombre_archivo)
+                if os.path.exists(origen_f) and not os.path.exists(destino_f):
+                    shutil.copy2(origen_f, destino_f)
+
+        rutas_docs = await guardar_archivos_documentacion_multiple(db, pedido, archivos_subidos)
         db.commit()
     except ValueError as e:
         db.rollback()
+        d["documentos_adjuntos"] = [
+            {"id": doc.id, "nombre_archivo": doc.nombre_archivo, "drive_link": doc.drive_link or ""}
+            for doc in pedido.lista_documentos
+        ]
         return _form(request, db, user, d, "editar", pedido, error=str(e), status=400)
     except IntegrityError:
         db.rollback()
         return _form(request, db, user, d, "editar", pedido, error="Error de integridad al actualizar la orden.", status=400)
 
     db.refresh(pedido)
-    ruta_doc = None
-    if isinstance(archivo_doc, UploadFile) and archivo_doc.filename:
-        ruta_doc = await guardar_archivo_documentacion(pedido, archivo_doc)
-        db.commit()
-        db.refresh(pedido)
-
-    estado = generar_salidas(db, pedido, ruta_doc)
+    ruta_doc_principal = rutas_docs[0] if rutas_docs else None
+    estado = generar_salidas(db, pedido, ruta_doc_principal, rutas_docs)
     request.session["flash"] = {"ok": True, "msg": f"Orden {pedido.po_codigo} actualizada. {estado}."}
     return RedirectResponse("/pedidos", status_code=303)
 
 
 @app.get("/pedidos/{pid}/documento")
-def descargar_documento_adjunto(pid: int, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+def descargar_documento_adjunto(pid: int, nombre: str = "", user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
     pedido = pedido_del_usuario(db, pid, user)
-    if not pedido or not pedido.documentacion_archivo:
+    if not pedido:
         return RedirectResponse("/pedidos", status_code=303)
-    ruta_doc = os.path.join(carpeta_po_local(pedido), pedido.documentacion_archivo)
+    arch_objetivo = nombre.strip() if nombre.strip() else (
+        pedido.documentacion_archivo.split("|")[0].strip() if pedido.documentacion_archivo else ""
+    )
+    if not arch_objetivo:
+        return RedirectResponse("/pedidos", status_code=303)
+    ruta_doc = os.path.join(carpeta_po_local(pedido), nombre_seguro(arch_objetivo))
     if not os.path.exists(ruta_doc):
         return RedirectResponse("/pedidos", status_code=303)
-    return FileResponse(ruta_doc, filename=pedido.documentacion_archivo)
+    return FileResponse(ruta_doc, filename=os.path.basename(ruta_doc))
+
+
+@app.get("/pedidos/{pid}/documento/{doc_id}")
+def descargar_documento_por_id(pid: int, doc_id: int, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    pedido = pedido_del_usuario(db, pid, user)
+    if not pedido:
+        return RedirectResponse("/pedidos", status_code=303)
+    doc = db.query(models.PedidoDocumento).filter(
+        models.PedidoDocumento.id == doc_id,
+        models.PedidoDocumento.pedido_id == pedido.id
+    ).first()
+    if not doc:
+        return RedirectResponse(f"/pedidos/{pid}/documento", status_code=303)
+    ruta_doc = os.path.join(carpeta_po_local(pedido), doc.nombre_archivo)
+    if not os.path.exists(ruta_doc):
+        return RedirectResponse("/pedidos", status_code=303)
+    return FileResponse(ruta_doc, filename=doc.nombre_archivo)
+
+
+@app.api_route("/pedidos/{pid}/documento/{doc_id}/eliminar", methods=["POST", "DELETE"])
+def eliminar_documento_individual(pid: int, doc_id: int, request: Request,
+                                  user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+    permitido, msg_horario = validar_horario_asesor(user)
+    if not permitido:
+        if request.method == "DELETE":
+            return JSONResponse({"ok": False, "msg": msg_horario}, status_code=403)
+        request.session["flash"] = {"ok": False, "msg": msg_horario}
+        return RedirectResponse(f"/pedidos/{pid}/editar", status_code=303)
+
+    pedido = pedido_del_usuario(db, pid, user)
+    if not pedido:
+        if request.method == "DELETE":
+            return JSONResponse({"ok": False, "msg": "Orden no encontrada."}, status_code=404)
+        return RedirectResponse("/pedidos", status_code=303)
+
+    doc = db.query(models.PedidoDocumento).filter(
+        models.PedidoDocumento.id == doc_id,
+        models.PedidoDocumento.pedido_id == pedido.id
+    ).first()
+
+    if doc:
+        ruta_local = os.path.join(carpeta_po_local(pedido), doc.nombre_archivo)
+        if os.path.exists(ruta_local):
+            try:
+                os.remove(ruta_local)
+            except Exception:
+                pass
+        if doc.drive_file_id:
+            service = obtener_drive()
+            if service:
+                eliminar_archivo_de_drive(service, doc.drive_file_id)
+        db.delete(doc)
+        db.flush()
+        db.refresh(pedido)
+        sincronizar_resumen_documentos_po(pedido)
+        db.commit()
+        generar_salidas(db, pedido)
+
+    if request.method == "DELETE" or "application/json" in (request.headers.get("accept") or ""):
+        return JSONResponse({"ok": True, "msg": "Documento eliminado correctamente."})
+
+    request.session["flash"] = {"ok": True, "msg": "Documento eliminado de la Orden de Compra."}
+    return RedirectResponse(f"/pedidos/{pid}/editar", status_code=303)
 
 
 @app.post("/pedidos/{pid}/eliminar")

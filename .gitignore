@@ -1,7 +1,18 @@
-token.json
-client_secrets.json
-client_secrets.json.json
-.secret_key
-pedidos.db
+# Entornos virtuales
 venv/
 __pycache__/
+*.pyc
+
+# Base de datos local de pruebas (opcional, si prefieres que producción use su propia BD)
+# pedidos.db
+
+# Credenciales de Google Drive y configuraciones SMTP privadas
+token.json
+correo_config.json
+
+# Directorio de reportes locales temporales
+Pedidos Nacionales/
+Pedidos Internacionales/
+Consolidados_Usuarios/
+Reportes_Gerenciales/
+.secret_key
