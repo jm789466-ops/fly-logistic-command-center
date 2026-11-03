@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import (Column, Integer, String, Date, DateTime, Text,
-                        Numeric, ForeignKey)
+                        Numeric, ForeignKey, Boolean)
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -37,6 +37,7 @@ class Asesor(Base):
     username = Column(String(50), unique=True, nullable=True, index=True)
     password_hash = Column(String(300), nullable=True)
     email = Column(String(150), nullable=True)
+    telefono = Column(String(50), nullable=True)
 
     rol = Column(String(50), nullable=False, default="Asesor")
     jefe_id = Column(Integer, ForeignKey("asesores.id"), nullable=True)
@@ -79,10 +80,14 @@ class Pedido(Base):
     numero_remision = Column(String(50), nullable=True)
 
     documentacion = Column(String(500), nullable=True)
+    documentacion_archivo = Column(String(500), nullable=True)
+    documentacion_drive_link = Column(String(500), nullable=True)
+
     estado = Column(String(25), nullable=False, default="En proceso")
     observaciones = Column(Text, nullable=True)
 
     drive_link = Column(String(500), nullable=True)
+    drive_folder_link = Column(String(500), nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -92,6 +97,25 @@ class Pedido(Base):
                          cascade="all, delete-orphan", order_by="ItemPedido.id")
     internacional = relationship("PedidoInternacional", back_populates="pedido",
                                  uselist=False, cascade="all, delete-orphan")
+    documentos = relationship("PedidoDocumento", back_populates="pedido",
+                              cascade="all, delete-orphan", order_by="PedidoDocumento.id")
+
+    @property
+    def po_codigo(self) -> str:
+        val = (self.po or "").strip()
+        return val if val.upper().startswith("PO") else f"PO-{val}"
+
+    @property
+    def moneda(self) -> str:
+        return "COP" if self.tipo == "Nacional" else "USD"
+
+    @property
+    def total_hazmat(self) -> Decimal:
+        return sum((i.cobro_hazmat_dec for i in self.items), Decimal(0))
+
+    @property
+    def total_certificados(self) -> Decimal:
+        return sum((i.cobro_certificado_dec for i in self.items), Decimal(0))
 
     @property
     def subtotal(self) -> Decimal:
@@ -114,12 +138,30 @@ class Pedido(Base):
         return self.total_productos_con_impuesto + self.valor_nacionalizacion_dec
 
     @property
+    def lista_documentos(self) -> list:
+        docs = list(self.documentos or [])
+        nombres_registrados = {d.nombre_archivo for d in docs}
+        if self.documentacion_archivo:
+            for nombre_leg in [x.strip() for x in self.documentacion_archivo.split("|") if x.strip()]:
+                if nombre_leg not in nombres_registrados:
+                    docs.append(PedidoDocumento(
+                        id=0,
+                        pedido_id=self.id,
+                        nombre_archivo=nombre_leg,
+                        drive_link=self.documentacion_drive_link or "",
+                        drive_file_id=""
+                    ))
+        return docs
+
+    @property
     def dias_habiles_info(self) -> dict:
+        etiqueta_po = self.po_codigo
         if not self.plazo_entrega:
             return {
                 "dias": None,
+                "orden_urgencia": 999999,
                 "en_contra": False,
-                "etiqueta": f"PO {self.po} · SIN PLAZO",
+                "etiqueta": f"{etiqueta_po} | SIN PLAZO",
                 "detalle": "Sin fecha límite",
                 "color": "slate"
             }
@@ -129,8 +171,9 @@ class Pedido(Base):
             palabra = "DÍA HÁBIL" if dias == 1 else "DÍAS HÁBILES"
             return {
                 "dias": dias,
+                "orden_urgencia": dias,
                 "en_contra": False,
-                "etiqueta": f"PO {self.po} · {dias} {palabra}",
+                "etiqueta": f"{etiqueta_po} | {dias} {palabra}",
                 "detalle": f"{dias} {palabra.lower()} a favor",
                 "color": "emerald"
             }
@@ -139,8 +182,9 @@ class Pedido(Base):
             palabra = "DÍA EN CONTRA" if dias_abs == 1 else "DÍAS EN CONTRA"
             return {
                 "dias": dias,
+                "orden_urgencia": dias,
                 "en_contra": True,
-                "etiqueta": f"PO {self.po} · {dias_abs} {palabra}",
+                "etiqueta": f"{etiqueta_po} | {dias_abs} {palabra}",
                 "detalle": f"{dias_abs} {palabra.lower()}",
                 "color": "red"
             }
@@ -161,16 +205,40 @@ class ItemPedido(Base):
     descripcion = Column(String(255), nullable=False)
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(14, 2), nullable=False)
+
+    cobro_hazmat = Column(Numeric(14, 2), nullable=False, default=0)
+    cobro_certificado = Column(Numeric(14, 2), nullable=False, default=0)
+    sin_iva = Column(Integer, nullable=False, default=0)
+
     iva_porcentaje = Column(Numeric(5, 2), nullable=False, default=19)
+    estado_producto = Column(String(30), nullable=False, default="PENDIENTE")
 
     pedido = relationship("Pedido", back_populates="items")
 
     @property
-    def subtotal_item(self) -> Decimal:
+    def cobro_hazmat_dec(self) -> Decimal:
+        return Decimal(str(self.cobro_hazmat or 0))
+
+    @property
+    def cobro_certificado_dec(self) -> Decimal:
+        return Decimal(str(self.cobro_certificado or 0))
+
+    @property
+    def subtotal_base_item(self) -> Decimal:
         return Decimal(str(self.cantidad or 0)) * Decimal(str(self.precio_unitario or 0))
 
     @property
+    def subtotal_item(self) -> Decimal:
+        return self.subtotal_base_item + self.cobro_hazmat_dec + self.cobro_certificado_dec
+
+    @property
+    def es_exento_iva(self) -> bool:
+        return bool(self.sin_iva) or Decimal(str(self.iva_porcentaje or 0)) == Decimal(0)
+
+    @property
     def impuesto_item(self) -> Decimal:
+        if self.es_exento_iva:
+            return Decimal("0.00")
         return self.subtotal_item * (Decimal(str(self.iva_porcentaje or 0)) / Decimal(100))
 
     @property
@@ -189,3 +257,16 @@ class PedidoInternacional(Base):
     fecha_nacionalizacion = Column(Date, nullable=True)
 
     pedido = relationship("Pedido", back_populates="internacional")
+
+
+class PedidoDocumento(Base):
+    __tablename__ = "pedido_documentos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=False, index=True)
+    nombre_archivo = Column(String(255), nullable=False)
+    drive_file_id = Column(String(120), nullable=True, default="")
+    drive_link = Column(String(500), nullable=True, default="")
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    pedido = relationship("Pedido", back_populates="documentos")
