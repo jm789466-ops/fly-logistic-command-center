@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4"
-     x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false }">
+     x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false, asesorFiltro: '{{ asesor_f }}' }">
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-4 border-b border-slate-200">
         <div>
             <div class="flex flex-wrap items-center gap-2">
@@ -20,7 +20,9 @@
         </div>
 
         <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-
+            <!-- ======================================================================= -->
+            <!-- CENTRO DE REPORTES EXCEL UNIFICADO (ASOCIADO AL FILTRO ACTIVO)         -->
+            <!-- ======================================================================= -->
             <div class="relative col-span-2 sm:col-auto">
                 <button type="button"
                         @click="menuExcel = !menuExcel; menuCorreos = false"
@@ -33,15 +35,15 @@
                 <div x-show="menuExcel" x-cloak x-transition
                      class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
                     <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">DESCARGA DE REPORTES ESTRUCTURADOS</span>
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">REPORTE ASOCIADO A VISTA ACTIVA</span>
                         <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#002060]">Rol: {{ user.rol }}</span>
                     </div>
 
-                    <!-- 1. Consolidado de Cartera Operativa por Usuario (Toma el valor actual del select asesor_id) -->
-                    <a :href="`/pedidos/consolidado/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                    <!-- 1. Consolidado de Cartera Operativa -->
+                    <a :href="`/pedidos/consolidado/excel?asesor_id=${asesorFiltro}`"
                        class="block px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 transition">
                         <div class="font-extrabold text-emerald-700 text-xs flex items-center justify-between">
-                            <span> Consolidado de Cartera Operativa</span>
+                            <span>📊 Consolidado de Cartera Operativa</span>
                             <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLSX</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
@@ -51,22 +53,22 @@
 
                     {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
                     <!-- 2. Control Maestro Global de Productos e Ítems -->
-                    <a :href="`/informes/productos_excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                    <a :href="`/informes/productos_excel?asesor_id=${asesorFiltro}`"
                        class="block px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-100 transition">
                         <div class="font-extrabold text-indigo-700 text-xs flex items-center justify-between">
-                            <span> Control Maestro de Productos</span>
+                            <span>📦 Control Maestro de Productos</span>
                             <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">XLSX</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
-                            Trazabilidad por SKU, proveedor, compra (SÍ / FALTA COMPRAR) y estado físico.
+                            Trazabilidad por SKU, proveedor y semáforo de compra según la vista activa.
                         </p>
                     </a>
 
                     <!-- 3. Informe Gerencial de Desempeño e Indicadores -->
-                    <a :href="`/informes/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
+                    <a :href="`/informes/excel?asesor_id=${asesorFiltro}`"
                        class="block px-4 py-2.5 hover:bg-blue-50 transition">
                         <div class="font-extrabold text-[#002060] text-xs flex items-center justify-between">
-                            <span> Informe Gerencial e Indicadores</span>
+                            <span>📈 Informe Gerencial e Indicadores</span>
                             <span class="text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded">XLSX</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
@@ -78,7 +80,7 @@
             </div>
 
             <!-- ======================================================================= -->
-            <!-- SELECTOR DE CORREOS (INDIVIDUAL POR PO / CONSOLIDADO DE FALTANTES)      -->
+            <!-- SELECTOR DE CORREOS                                                     -->
             <!-- ======================================================================= -->
             {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
             <div class="relative col-span-2 sm:col-auto">
@@ -96,7 +98,6 @@
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Centro de Notificaciones SMTP</span>
                     </div>
 
-                    <!-- Opción A: Notificación Individual por PO -->
                     <button type="button"
                             @click="modalCorreoIndividual = true; menuCorreos = false"
                             class="w-full text-left px-4 py-2.5 hover:bg-amber-50 border-b border-slate-100 transition">
@@ -104,7 +105,6 @@
                         <span class="text-[11px] text-slate-500">Seleccionar una Orden de Compra específica para enviar alerta</span>
                     </button>
 
-                    <!-- Opción B: Notificar Todas las POs Activas del Equipo -->
                     <form action="/pedidos/notificar_proximos" method="post" class="m-0 border-b border-slate-100">
                         <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition">
                             <span class="font-extrabold text-[#002060] block text-xs">📬 Seguimiento Masivo de POs Activas</span>
@@ -112,7 +112,6 @@
                         </button>
                     </form>
 
-                    <!-- Opción C: Reporte Consolidado de Faltantes (Restringido a Gerencia y Administradores) -->
                     {% if user.rol in ['Administrador', 'Gerencia'] %}
                     <form action="/pedidos/notificar_faltantes" method="post" class="m-0">
                         <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-red-50 transition">
@@ -241,12 +240,12 @@
         {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
         <div class="lg:col-span-2">
             <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Vista Cartera / Asesor</label>
-            <select name="asesor_id" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
-                <option value="{{ user.id }}" {% if asesor_f == (user.id ~ '') %}selected{% endif %}>Mi Cartera Propia ({{ user.nombre }})</option>
-                <option value="todos" {% if asesor_f == 'todos' %}selected{% endif %}>Todos los Asesores (Global)</option>
+            <select name="asesor_id" x-model="asesorFiltro" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
+                <option value="{{ user.id }}">Mi Cartera Propia ({{ user.nombre }})</option>
+                <option value="todos">Todos los Asesores (Global)</option>
                 {% for a in asesores_disponibles %}
                     {% if a.id != user.id %}
-                    <option value="{{ a.id }}" {% if asesor_f == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
+                    <option value="{{ a.id }}">{{ a.nombre }} ({{ a.rol }})</option>
                     {% endif %}
                 {% endfor %}
             </select>

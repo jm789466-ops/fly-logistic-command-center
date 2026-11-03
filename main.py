@@ -60,7 +60,7 @@ METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia", "Efectiv
 UNIDADES_MEDIDA = ["UND", "EA", "GAL", "LT", "KIT", "LB", "ROLLO", "CAJA", "MT", "PC", "SET"]
 
 MAX_ARCHIVOS_PO = 10
-HORA_LIMITE_ASESOR = time(17, 30)  # Restricción horaria 5:30 p.m.[cite: 3]
+HORA_LIMITE_ASESOR = time(17, 30)
 
 PESOS_PROBABILIDAD = {
     "En proceso": 25,
@@ -350,9 +350,6 @@ def generar_salidas(
 
 
 def sugerir_siguiente_po(db: Session) -> str:
-    """
-    Generador de consecutivo blindado para alta concurrencia masiva (10 a 100+ usuarios simultáneos)[cite: 3].
-    """
     try:
         todas_pos = [r[0] for r in db.query(models.Pedido.po).all() if r[0]]
         max_num = 0
@@ -1458,7 +1455,8 @@ async def perfil_datos(request: Request, user: models.Asesor = Depends(usuario_a
 
 @app.post("/perfil/smtp", response_class=HTMLResponse)
 async def perfil_smtp(request: Request, user: models.Asesor = Depends(usuario_actual)):
-    if user.rol not in ROLES_SUPERIORES:
+    # Restricción exclusiva para Administrador
+    if user.rol != "Administrador":
         return RedirectResponse("/perfil", status_code=303)
     f = await request.form()
     host = (f.get("smtp_host") or "mail.flylogistic.aero").strip()
