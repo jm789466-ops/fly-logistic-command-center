@@ -1,9 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="mb-5">
-    <div class="mb-4">
-        <h2 class="text-lg sm:text-xl font-extrabold fly-text">Gestión de Usuarios y Permisos</h2>
-        <p class="text-xs text-slate-500">Administración de cuentas corporativas, cargos y asignación de supervisores</p>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+        <div>
+            <h2 class="text-lg sm:text-xl font-extrabold fly-text">Gestión de Usuarios y Permisos</h2>
+            <p class="text-xs text-slate-500">Administración de cuentas corporativas, cargos, supervisores y política horaria de seguridad</p>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl text-xs text-amber-900 font-semibold flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+            <span>Restricción Horaria Activa: Rol <strong>Asesor</strong> habilitado para crear/editar POs hasta las <strong>5:30 p.m.</strong></span>
+        </div>
     </div>
 
     {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
@@ -70,6 +76,11 @@
             <div>
                 <div class="font-extrabold text-slate-900 text-sm">{{ u.nombre }}</div>
                 <div class="text-slate-500">Usuario: <strong class="font-mono text-blue-900">{{ u.username }}</strong></div>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                    <a href="/pedidos/consolidado/excel?asesor_id={{ u.id }}" class="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
+                        Descargar Consolidado Excel
+                    </a>
+                </div>
             </div>
             <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 font-bold border border-blue-200">{{ u.rol }}</span>
         </div>
@@ -137,6 +148,14 @@
                 <td class="px-4 py-3 break-words">
                     <div class="font-extrabold text-slate-900">{{ u.nombre }}</div>
                     <div class="text-[11px] text-slate-500">Usuario: <span class="font-mono font-bold text-blue-900">{{ u.username }}</span></div>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                        <a href="/pedidos/consolidado/excel?asesor_id={{ u.id }}" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
+                            Excel Cartera
+                        </a>
+                        {% if u.rol == 'Asesor' %}
+                        <span class="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded" title="Restricción horaria 5:30 p.m.">Límite 5:30 PM</span>
+                        {% endif %}
+                    </div>
                 </td>
 
                 <td class="px-4 py-3">

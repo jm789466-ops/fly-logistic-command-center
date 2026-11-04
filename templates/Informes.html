@@ -5,18 +5,9 @@
 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
     <div>
         <h2 class="text-lg sm:text-2xl font-extrabold fly-text">Indicadores Gerenciales y Control Maestro de Ítems</h2>
-        <p class="text-xs text-slate-500 font-medium">Análisis de desempeño, estado de compras por producto y cumplimiento de entregas</p>
+        <p class="text-xs text-slate-500 font-medium">Análisis corporativo de desempeño, estado de compras por producto y cumplimiento de acuerdos de nivel de servicio (SLA)</p>
     </div>
-    <div class="flex flex-wrap gap-2">
-        <a href="/informes/productos_excel?asesor_id={{ f_asesor }}&tipo={{ f_tipo }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm inline-flex items-center gap-1.5 transition uppercase tracking-wider">
-            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-            <span>Maestro de Productos</span>
-        </a>
-        <a href="/informes/excel?asesor_id={{ f_asesor }}&tipo={{ f_tipo }}&desde={{ f_desde }}&hasta={{ f_hasta }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-sm inline-flex items-center gap-1.5 transition uppercase tracking-wider">
-            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-            <span>Informe Gerencial</span>
-        </a>
-    </div>
+    <!-- Botones de Excel removidos de esta vista para centralizarlos en el dashboard principal -->
 </div>
 
 <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
@@ -96,16 +87,17 @@
     <div class="fly-bg text-white px-5 py-3 flex justify-between items-center">
         <h3 class="font-bold text-xs uppercase tracking-wider">Matriz de Rendimiento por Responsable</h3>
     </div>
-    <table class="w-full min-w-[760px] table-fixed divide-y divide-slate-200 text-xs">
+    <table class="w-full min-w-[820px] table-fixed divide-y divide-slate-200 text-xs">
         <thead class="bg-slate-100 text-[11px] uppercase text-slate-600">
             <tr>
-                <th class="w-[20%] px-3 py-2.5 text-left">Responsable</th>
-                <th class="w-[14%] px-3 py-2.5 text-left">Superior Directo</th>
-                <th class="w-[8%] px-3 py-2.5 text-center">POs</th>
-                <th class="w-[9%] px-3 py-2.5 text-center">Entregados</th>
-                <th class="w-[9%] px-3 py-2.5 text-center">Activos</th>
-                <th class="w-[10%] px-3 py-2.5 text-center">Ítems Pend.</th>
-                <th class="w-[10%] px-3 py-2.5 text-center">Promedio</th>
+                <th class="w-[18%] px-3 py-2.5 text-left">Responsable</th>
+                <th class="w-[13%] px-3 py-2.5 text-left">Superior Directo</th>
+                <th class="w-[7%] px-3 py-2.5 text-center">POs</th>
+                <th class="w-[8%] px-3 py-2.5 text-center">Entregados</th>
+                <th class="w-[8%] px-3 py-2.5 text-center">Activos</th>
+                <th class="w-[9%] px-3 py-2.5 text-center">Ítems Pend.</th>
+                <th class="w-[9%] px-3 py-2.5 text-center">Promedio</th>
+                <th class="w-[8%] px-3 py-2.5 text-center">% SLA</th>
                 <th class="w-[8%] px-3 py-2.5 text-center">Nivel</th>
                 <th class="w-[12%] px-3 py-2.5 text-right">Monto Gestionado</th>
             </tr>
@@ -120,6 +112,7 @@
                 <td class="px-3 py-2.5 text-center text-amber-600 font-bold">{{ a.pendientes }}</td>
                 <td class="px-3 py-2.5 text-center text-red-600 font-bold">{{ a.items_pendientes_compra }}</td>
                 <td class="px-3 py-2.5 text-center">{{ a.tiempo_promedio }} días</td>
+                <td class="px-3 py-2.5 text-center font-bold text-[#002060]">{{ a.sla_pct }}%</td>
                 <td class="px-3 py-2.5 text-center">
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if a.nivel == 'Sobresaliente' %}bg-emerald-100 text-emerald-800{% elif a.nivel == 'Óptimo' %}bg-blue-100 text-blue-800{% else %}bg-amber-100 text-amber-800{% endif %}">
                         {{ a.nivel }}
@@ -135,22 +128,19 @@
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
     <div class="bg-slate-800 text-white px-5 py-3 flex flex-wrap justify-between items-center gap-2">
         <h3 class="font-bold text-xs uppercase tracking-wider">Consolidado Maestro de Productos y Estados por PO</h3>
-        <a href="/informes/productos_excel?asesor_id={{ f_asesor }}&tipo={{ f_tipo }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-            <span>Exportar Tabla a Excel</span>
-        </a>
     </div>
-    <table class="w-full min-w-[820px] table-fixed divide-y divide-slate-200 text-xs">
+    <table class="w-full min-w-[920px] table-fixed divide-y divide-slate-200 text-xs">
         <thead class="bg-slate-50 text-[11px] uppercase text-slate-600">
             <tr>
-                <th class="w-[11%] px-3 py-2.5 text-left">PO</th>
-                <th class="w-[14%] px-3 py-2.5 text-left">Asesor</th>
-                <th class="w-[14%] px-3 py-2.5 text-left">Cliente</th>
-                <th class="w-[14%] px-3 py-2.5 text-left">Proveedor</th>
+                <th class="w-[10%] px-3 py-2.5 text-left">PO</th>
+                <th class="w-[12%] px-3 py-2.5 text-left">Asesor</th>
+                <th class="w-[13%] px-3 py-2.5 text-left">Cliente</th>
+                <th class="w-[13%] px-3 py-2.5 text-left">Proveedor</th>
                 <th class="w-[11%] px-3 py-2.5 text-center">Compra Prov.</th>
-                <th class="w-[18%] px-3 py-2.5 text-left">Part Number / Descripción</th>
-                <th class="w-[7%] px-3 py-2.5 text-center">Cant.</th>
-                <th class="w-[11%] px-3 py-2.5 text-center">Estado Ítem</th>
+                <th class="w-[17%] px-3 py-2.5 text-left">Part Number / Descripción</th>
+                <th class="w-[6%] px-3 py-2.5 text-center">Cant.</th>
+                <th class="w-[9%] px-3 py-2.5 text-right">Total Línea</th>
+                <th class="w-[9%] px-3 py-2.5 text-center">Estado Ítem</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
@@ -158,15 +148,16 @@
             <tr class="hover:bg-slate-50">
                 <td class="px-3 py-2 font-extrabold text-[#002060] break-words">
                     <a href="/pedidos/{{ it.pedido_id }}/editar" class="hover:underline">{{ it.po }}</a>
+                    <span class="block text-[10px] font-normal text-slate-500">{{ it.tipo }} ({{ it.moneda }})</span>
                 </td>
                 <td class="px-3 py-2 break-words">{{ it.asesor }}</td>
                 <td class="px-3 py-2 font-semibold break-words">{{ it.cliente }}</td>
                 <td class="px-3 py-2 break-words">{{ it.proveedor }}</td>
                 <td class="px-3 py-2 text-center">
                     {% if it.comprado %}
-                    <span class="text-emerald-700 font-bold text-[11px]">{{ it.fecha_compra }}</span>
+                    <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">SÍ ({{ it.fecha_compra }})</span>
                     {% else %}
-                    <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">PENDIENTE</span>
+                    <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">FALTA COMPRAR</span>
                     {% endif %}
                 </td>
                 <td class="px-3 py-2 break-words">
@@ -174,6 +165,9 @@
                     <span class="block text-[11px] text-slate-500">{{ it.descripcion }}</span>
                 </td>
                 <td class="px-3 py-2 text-center font-bold">{{ it.cantidad }} {{ it.unidad_medida }}</td>
+                <td class="px-3 py-2 text-right font-bold text-slate-800">
+                    {{ it.total_item | money }} <span class="text-[10px] text-slate-500">{{ it.moneda }}</span>
+                </td>
                 <td class="px-3 py-2 text-center">
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold
                         {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
@@ -185,7 +179,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay productos registrados con este filtro.</td>
+                <td colspan="9" class="px-4 py-8 text-center text-slate-400">No hay productos registrados con este filtro.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -204,8 +198,8 @@
         data: {
             labels: mesesLabels,
             datasets: [
-                { label: 'Nacional ($)', data: mesesNacData, backgroundColor: '#002060', borderRadius: 4 },
-                { label: 'Internacional ($)', data: mesesIntData, backgroundColor: '#0ea5e9', borderRadius: 4 }
+                { label: 'Nacional (COP $)', data: mesesNacData, backgroundColor: '#002060', borderRadius: 4 },
+                { label: 'Internacional (USD $)', data: mesesIntData, backgroundColor: '#0ea5e9', borderRadius: 4 }
             ]
         },
         options: { responsive: true, scales: { y: { beginAtZero: true } } }
