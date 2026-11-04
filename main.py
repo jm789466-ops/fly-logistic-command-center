@@ -72,7 +72,6 @@ ESTADOS_PRODUCTO = [
 
 =======
 ESTADOS_PRODUCTO = ["PENDIENTE", "DESPACHADO", "EN FLY", "LLEGADO FLY", "ENTREGADO"]
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
 METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia", "Efectivo"]
 UNIDADES_MEDIDA = ["UND", "EA", "GAL", "LT", "KIT", "LB", "ROLLO", "CAJA", "MT", "PC", "SET"]
 
