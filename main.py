@@ -55,9 +55,7 @@ ROLES_GERENCIA_ADMIN = ["Administrador", "Gerencia"]
 
 ESTADOS = ["En proceso", "Entregado"]
 ESTADOS_ADUANA = ["No aplica / Pendiente", "En revisión aduanera", "Pago de aranceles", "Liberado / Nacionalizado"]
-<<<<<<< HEAD
 
-# NUEVOS ESTADOS DE LOS ÍTEMS SOLICITADOS
 ESTADOS_PRODUCTO = [
     "PENDIENTE DE PAGO",
     "COMPRADO",
@@ -70,8 +68,6 @@ ESTADOS_PRODUCTO = [
     "ENTREGADO AL CLIENTE"
 ]
 
-=======
-ESTADOS_PRODUCTO = ["PENDIENTE", "DESPACHADO", "EN FLY", "LLEGADO FLY", "ENTREGADO"]
 METODOS_PAGO_OPCIONES = ["Visa", "American", "PayPal", "Transferencia", "Efectivo"]
 UNIDADES_MEDIDA = ["UND", "EA", "GAL", "LT", "KIT", "LB", "ROLLO", "CAJA", "MT", "PC", "SET"]
 
@@ -456,11 +452,7 @@ def migrar_bd():
             con.execute(text("UPDATE pedido_items SET cobro_hazmat = 0 WHERE cobro_hazmat IS NULL"))
             con.execute(text("UPDATE pedido_items SET cobro_certificado = 0 WHERE cobro_certificado IS NULL"))
             con.execute(text("UPDATE pedido_items SET sin_iva = 0 WHERE sin_iva IS NULL"))
-<<<<<<< HEAD
             con.execute(text("UPDATE pedido_items SET estado_producto = 'PENDIENTE DE PAGO' WHERE estado_producto IS NULL OR estado_producto = '' OR estado_producto = 'PENDIENTE'"))
-=======
-            con.execute(text("UPDATE pedido_items SET estado_producto = 'PENDIENTE' WHERE estado_producto IS NULL OR estado_producto = ''"))
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
 
         if insp.has_table("pedidos_internacionales"):
             con.execute(text("UPDATE pedidos_internacionales SET llega_click_mail = 'Si' WHERE fecha_click_mail IS NOT NULL AND (llega_click_mail IS NULL OR llega_click_mail = '')"))
@@ -815,11 +807,7 @@ def construir_cuerpo_alerta_po(p: models.Pedido) -> tuple[str, str]:
     lineas_items = []
     for idx, it in enumerate(p.items, start=1):
         alt_txt = f" (Alterno: {it.parte_numero_alterno})" if it.parte_numero_alterno else ""
-<<<<<<< HEAD
         est_prod = it.estado_producto or "PENDIENTE DE PAGO"
-=======
-        est_prod = it.estado_producto or "PENDIENTE"
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
         imp_txt = "EXENTO (0%)" if it.es_exento_iva else f"{Decimal(str(it.iva_porcentaje)):g}%"
         adicionales_txt = ""
         if it.cobro_hazmat_dec > 0 or it.cobro_certificado_dec > 0:
@@ -877,11 +865,7 @@ def construir_cuerpo_consolidado_faltantes(pedidos: list[models.Pedido]) -> tupl
     for p in pedidos:
         moneda = p.moneda
         for it in p.items:
-<<<<<<< HEAD
             if not it.fecha_compra_proveedor or it.estado_producto in ("PENDIENTE DE PAGO", "PENDIENTE", "COMPRADO"):
-=======
-            if not it.fecha_compra_proveedor or it.estado_producto == "PENDIENTE":
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                 total_faltantes += 1
                 lineas.append(
                     f"- PO: {p.po_codigo} ({p.tipo}) | Asesor: {p.asesor.nombre if p.asesor else 'N/A'} | "
@@ -942,11 +926,7 @@ def datos_desde_form(f) -> dict:
                 fila_dict[k] = vals[idx]
             else:
                 if k == "estado_producto":
-<<<<<<< HEAD
                     fila_dict[k] = "PENDIENTE DE PAGO"
-=======
-                    fila_dict[k] = "PENDIENTE"
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                 elif k == "unidad_medida":
                     fila_dict[k] = "UND"
                 elif k in ("cobro_hazmat", "cobro_certificado"):
@@ -1009,11 +989,7 @@ def datos_desde_pedido(p: models.Pedido) -> dict:
             "cobro_certificado": f"{Decimal(str(getattr(it, 'cobro_certificado', 0) or 0)):.2f}",
             "sin_iva": "1" if (getattr(it, "sin_iva", 0) or Decimal(str(it.iva_porcentaje or 0)) == 0) else "0",
             "iva_item": "0" if (getattr(it, "sin_iva", 0) or Decimal(str(it.iva_porcentaje or 0)) == 0) else f"{Decimal(str(it.iva_porcentaje if it.iva_porcentaje is not None else p.iva_porcentaje)):g}",
-<<<<<<< HEAD
             "estado_producto": it.estado_producto or "PENDIENTE DE PAGO",
-=======
-            "estado_producto": it.estado_producto or "PENDIENTE",
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
         } for it in p.items],
     }
 
@@ -1111,15 +1087,9 @@ def parsear(d: dict, tipo_fijo: str | None = None) -> dict:
                 raise ValueError(f"Ítem {n}: el impuesto debe estar entre 0 y 100.")
             es_sin_iva = 1 if iva_it == Decimal("0") else 0
 
-<<<<<<< HEAD
         est_prod = (it.get("estado_producto") or "PENDIENTE DE PAGO").strip().upper()
         if est_prod not in ESTADOS_PRODUCTO:
             est_prod = "PENDIENTE DE PAGO"
-=======
-        est_prod = (it.get("estado_producto") or "PENDIENTE").strip().upper()
-        if est_prod not in ESTADOS_PRODUCTO:
-            est_prod = "PENDIENTE"
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
 
         items.append({
             "fecha_compra_proveedor": _fecha(it.get("fecha_compra_prov"), f"compra a proveedor (ítem {n})"),
@@ -1497,7 +1467,6 @@ async def perfil_datos(request: Request, user: models.Asesor = Depends(usuario_a
 
 @app.post("/perfil/smtp", response_class=HTMLResponse)
 async def perfil_smtp(request: Request, user: models.Asesor = Depends(usuario_actual)):
-    # Restricción exclusiva para Administrador
     if user.rol != "Administrador":
         return RedirectResponse("/perfil", status_code=303)
     f = await request.form()
@@ -1910,11 +1879,7 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
         for it in p.items:
             prov_nom = it.proveedor or "Sin Proveedor"
             proveedores_top[prov_nom] = proveedores_top.get(prov_nom, 0.0) + float(it.subtotal_item)
-<<<<<<< HEAD
             if not it.fecha_compra_proveedor or it.estado_producto in ("PENDIENTE DE PAGO", "PENDIENTE", "COMPRADO"):
-=======
-            if not it.fecha_compra_proveedor or it.estado_producto == "PENDIENTE":
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                 faltan_compras_item += 1
                 items_sin_compra += 1
 
@@ -1938,11 +1903,7 @@ def _construir_analitica(db: Session, user: models.Asesor, asesor_filtro: str = 
                 "subtotal_item": float(it.subtotal_item),
                 "iva_porcentaje": 0.0 if it.es_exento_iva else float(it.iva_porcentaje or 0),
                 "total_item": float(it.total_item),
-<<<<<<< HEAD
                 "estado_producto": it.estado_producto or "PENDIENTE DE PAGO",
-=======
-                "estado_producto": it.estado_producto or "PENDIENTE",
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                 "estado_po": p.estado,
                 "semaforo": info_habiles["etiqueta"],
             })
@@ -2473,11 +2434,7 @@ def nuevo_form(request: Request, user: models.Asesor = Depends(usuario_actual), 
             "parte_numero_alterno": "", "unidad_medida": "UND", "descripcion": "",
             "cantidad": "1", "precio_unitario": "", "cobro_hazmat": "0.00",
             "cobro_certificado": "0.00", "sin_iva": "0", "iva_item": "19",
-<<<<<<< HEAD
             "estado_producto": "PENDIENTE DE PAGO"
-=======
-            "estado_producto": "PENDIENTE"
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
         }]
     )
     return _form(request, db, user, d, "nuevo")
