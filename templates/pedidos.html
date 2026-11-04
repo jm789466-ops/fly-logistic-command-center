@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4"
-<<<<<<< HEAD
-     x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false }">
-=======
      x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false, asesorFiltro: '{{ asesor_f }}' }">
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-4 border-b border-slate-200">
         <div>
             <div class="flex flex-wrap items-center gap-2">
@@ -24,13 +20,9 @@
         </div>
 
         <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-<<<<<<< HEAD
-
-=======
             <!-- ======================================================================= -->
             <!-- CENTRO DE REPORTES EXCEL UNIFICADO (ASOCIADO AL FILTRO ACTIVO)         -->
             <!-- ======================================================================= -->
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
             <div class="relative col-span-2 sm:col-auto">
                 <button type="button"
                         @click="menuExcel = !menuExcel; menuCorreos = false"
@@ -43,17 +35,6 @@
                 <div x-show="menuExcel" x-cloak x-transition
                      class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
                     <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-<<<<<<< HEAD
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">DESCARGA DE REPORTES ESTRUCTURADOS</span>
-                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#002060]">Rol: {{ user.rol }}</span>
-                    </div>
-
-                    <!-- 1. Consolidado de Cartera Operativa por Usuario (Toma el valor actual del select asesor_id) -->
-                    <a :href="`/pedidos/consolidado/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
-                       class="block px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 transition">
-                        <div class="font-extrabold text-emerald-700 text-xs flex items-center justify-between">
-                            <span> Consolidado de Cartera Operativa</span>
-=======
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">REPORTE ASOCIADO A VISTA ACTIVA</span>
                         <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#002060]">Rol: {{ user.rol }}</span>
                     </div>
@@ -63,7 +44,6 @@
                        class="block px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 transition">
                         <div class="font-extrabold text-emerald-700 text-xs flex items-center justify-between">
                             <span>📊 Consolidado de Cartera Operativa</span>
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                             <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLSX</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
@@ -73,16 +53,6 @@
 
                     {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
                     <!-- 2. Control Maestro Global de Productos e Ítems -->
-<<<<<<< HEAD
-                    <a :href="`/informes/productos_excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
-                       class="block px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-100 transition">
-                        <div class="font-extrabold text-indigo-700 text-xs flex items-center justify-between">
-                            <span> Control Maestro de Productos</span>
-                            <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">XLSX</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            Trazabilidad por SKU, proveedor, compra (SÍ / FALTA COMPRAR) y estado físico.
-=======
                     <a :href="`/informes/productos_excel?asesor_id=${asesorFiltro}`"
                        class="block px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-100 transition">
                         <div class="font-extrabold text-indigo-700 text-xs flex items-center justify-between">
@@ -91,22 +61,14 @@
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
                             Trazabilidad por SKU, proveedor y semáforo de compra según la vista activa.
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                         </p>
                     </a>
 
                     <!-- 3. Informe Gerencial de Desempeño e Indicadores -->
-<<<<<<< HEAD
-                    <a :href="`/informes/excel?asesor_id=${encodeURIComponent(document.querySelector('[name=\'asesor_id\']')?.value || '{{ asesor_f }}')}`"
-                       class="block px-4 py-2.5 hover:bg-blue-50 transition">
-                        <div class="font-extrabold text-[#002060] text-xs flex items-center justify-between">
-                            <span> Informe Gerencial e Indicadores</span>
-=======
                     <a :href="`/informes/excel?asesor_id=${asesorFiltro}`"
                        class="block px-4 py-2.5 hover:bg-blue-50 transition">
                         <div class="font-extrabold text-[#002060] text-xs flex items-center justify-between">
                             <span>📈 Informe Gerencial e Indicadores</span>
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                             <span class="text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded">XLSX</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
@@ -118,11 +80,7 @@
             </div>
 
             <!-- ======================================================================= -->
-<<<<<<< HEAD
-            <!-- SELECTOR DE CORREOS (INDIVIDUAL POR PO / CONSOLIDADO DE FALTANTES)      -->
-=======
             <!-- SELECTOR DE CORREOS                                                     -->
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
             <!-- ======================================================================= -->
             {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
             <div class="relative col-span-2 sm:col-auto">
@@ -140,10 +98,6 @@
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Centro de Notificaciones SMTP</span>
                     </div>
 
-<<<<<<< HEAD
-                    <!-- Opción A: Notificación Individual por PO -->
-=======
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                     <button type="button"
                             @click="modalCorreoIndividual = true; menuCorreos = false"
                             class="w-full text-left px-4 py-2.5 hover:bg-amber-50 border-b border-slate-100 transition">
@@ -151,10 +105,6 @@
                         <span class="text-[11px] text-slate-500">Seleccionar una Orden de Compra específica para enviar alerta</span>
                     </button>
 
-<<<<<<< HEAD
-                    <!-- Opción B: Notificar Todas las POs Activas del Equipo -->
-=======
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                     <form action="/pedidos/notificar_proximos" method="post" class="m-0 border-b border-slate-100">
                         <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition">
                             <span class="font-extrabold text-[#002060] block text-xs">📬 Seguimiento Masivo de POs Activas</span>
@@ -162,10 +112,6 @@
                         </button>
                     </form>
 
-<<<<<<< HEAD
-                    <!-- Opción C: Reporte Consolidado de Faltantes (Restringido a Gerencia y Administradores) -->
-=======
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                     {% if user.rol in ['Administrador', 'Gerencia'] %}
                     <form action="/pedidos/notificar_faltantes" method="post" class="m-0">
                         <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-red-50 transition">
@@ -294,21 +240,12 @@
         {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
         <div class="lg:col-span-2">
             <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Vista Cartera / Asesor</label>
-<<<<<<< HEAD
-            <select name="asesor_id" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
-                <option value="{{ user.id }}" {% if asesor_f == (user.id ~ '') %}selected{% endif %}>Mi Cartera Propia ({{ user.nombre }})</option>
-                <option value="todos" {% if asesor_f == 'todos' %}selected{% endif %}>Todos los Asesores (Global)</option>
-                {% for a in asesores_disponibles %}
-                    {% if a.id != user.id %}
-                    <option value="{{ a.id }}" {% if asesor_f == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
-=======
             <select name="asesor_id" x-model="asesorFiltro" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
                 <option value="{{ user.id }}">Mi Cartera Propia ({{ user.nombre }})</option>
                 <option value="todos">Todos los Asesores (Global)</option>
                 {% for a in asesores_disponibles %}
                     {% if a.id != user.id %}
                     <option value="{{ a.id }}">{{ a.nombre }} ({{ a.rol }})</option>
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
                     {% endif %}
                 {% endfor %}
             </select>
@@ -387,11 +324,8 @@
                     <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
                     <span class="text-slate-600">| {{ it.descripcion }}</span>
                 </div>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0
-                    {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
-                    {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
-                    {% else %}bg-amber-100 text-amber-800{% endif %}">
-                    {{ it.estado_producto or 'PENDIENTE' }}
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
+                    {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
                 </span>
             </div>
             {% endfor %}
@@ -403,11 +337,8 @@
                         <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
                         <span class="text-slate-600">| {{ it.descripcion }}</span>
                     </div>
-                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0
-                        {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
-                        {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
-                        {% else %}bg-amber-100 text-amber-800{% endif %}">
-                        {{ it.estado_producto or 'PENDIENTE' }}
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
+                        {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
                     </span>
                 </div>
                 {% endfor %}
@@ -490,11 +421,8 @@
                                 <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
                                 {% endif %}
                             </div>
-                            <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
-                                {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
-                                {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
-                                {% else %}bg-amber-100 text-amber-800{% endif %}">
-                                {{ it.estado_producto or 'PENDIENTE' }}
+                            <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
+                                {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
                             </span>
                         </div>
                         {% endfor %}
@@ -511,11 +439,8 @@
                                     <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
                                     {% endif %}
                                 </div>
-                                <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0
-                                    {% if it.estado_producto == 'ENTREGADO' %}bg-emerald-100 text-emerald-800
-                                    {% elif it.estado_producto in ['EN FLY', 'LLEGADO FLY', 'DESPACHADO'] %}bg-sky-100 text-sky-800
-                                    {% else %}bg-amber-100 text-amber-800{% endif %}">
-                                    {{ it.estado_producto or 'PENDIENTE' }}
+                                <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
+                                    {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
                                 </span>
                             </div>
                             {% endfor %}
