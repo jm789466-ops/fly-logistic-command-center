@@ -1,72 +1,163 @@
 {% extends "base.html" %}
+{% block title %}Registro de Personal — Fly Logistic{% endblock %}
+
 {% block content %}
-<div class="max-w-lg mx-auto mt-4 sm:mt-8 bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-    <div class="fly-bg text-white p-5 sm:p-6 flex items-center justify-between gap-4">
-        <div>
-            <h1 class="text-base sm:text-lg font-extrabold uppercase tracking-wide text-white">Registro de Asesor Corporativo</h1>
-            <p class="text-xs text-sky-200 mt-1">Autorización validada por Administración, Gerencia o Jefatura de Área</p>
+<div class="min-h-[82vh] flex items-center justify-center px-3 py-8">
+    <div class="fly-card max-w-xl w-full overflow-hidden border border-slate-200/90 shadow-2xl">
+
+        <!-- Encabezado Corporativo -->
+        <div class="fly-header-gradient text-white px-6 py-6 text-center">
+            <div class="h-16 w-16 mx-auto rounded-2xl bg-white p-2 shadow-lg flex items-center justify-center mb-3">
+                <img src="{{ LOGO_SRC or '/logo_fly.webp' }}" onerror="this.onerror=null; this.src='/logo-empresa';" alt="Fly Logistic" class="max-h-full max-w-full object-contain">
+            </div>
+            <span class="inline-block text-[10px] font-extrabold uppercase tracking-widest px-3 py-0.5 rounded-full bg-white/15 text-sky-200 border border-sky-300/30">
+                Alta Segura de Personal Autorizado
+            </span>
+            <h1 class="text-lg sm:text-xl font-extrabold text-white mt-1.5">
+                Crear Cuenta en el Centro de Comando
+            </h1>
+            <p class="text-xs text-sky-100/90 mt-1">
+                Completa tus datos corporativos. La asignación de permisos se valida mediante la clave directiva autorizada.
+            </p>
         </div>
-        <div class="bg-white rounded-xl px-3 py-1.5 shrink-0 shadow">
-            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-8 sm:h-9 w-auto object-contain">
+
+        <!-- Formulario Guiado de Registro -->
+        <div class="p-6 sm:p-7 bg-white space-y-4">
+            {% if error %}
+            <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold leading-relaxed">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="post" action="/registro" class="space-y-4 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="reg_nombre" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            1. Nombre y Apellido Completo *
+                        </label>
+                        <input type="text"
+                               id="reg_nombre"
+                               name="nombre"
+                               required
+                               value="{{ v.nombre if v and v.nombre else '' }}"
+                               placeholder="Ej. Andrés Camilo Rojas"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                    </div>
+
+                    <div>
+                        <label for="reg_username" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            2. Nombre de Usuario para Ingresar *
+                        </label>
+                        <input type="text"
+                               id="reg_username"
+                               name="username"
+                               required
+                               value="{{ v.username if v and v.username else '' }}"
+                               placeholder="Ej. arojas o andres.rojas"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono-code font-bold text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="reg_email" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            3. Correo Electrónico Corporativo *
+                        </label>
+                        <input type="email"
+                               id="reg_email"
+                               name="email"
+                               required
+                               value="{{ v.email if v and v.email else '' }}"
+                               placeholder="colaborador@flylogistic.aero"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                    </div>
+
+                    <div>
+                        <label for="reg_rol" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            4. Cargo / Rol a Desempeñar *
+                        </label>
+                        <select id="reg_rol"
+                                name="rol"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                            <option value="Asesor" {% if v and v.rol == 'Asesor' %}selected{% endif %}>Asesor Comercial y Operativo (POs y Cotizaciones)</option>
+                            <option value="Almacenista" {% if v and v.rol == 'Almacenista' %}selected{% endif %}>Almacenista (Acceso Exclusivo a Inventario y Bodega)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="reg_jefe" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                        5. Jefe de Área o Superior Asignado
+                    </label>
+                    <select id="reg_jefe"
+                            name="jefe_id"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                        <option value="">Seleccionar Jefatura de Área o Administración...</option>
+                        {% for sup in (superiores or jefes_disponibles or []) %}
+                        <option value="{{ sup.id }}" {% if v and v.jefe_id == (sup.id|string) %}selected{% endif %}>{{ sup.nombre }} ({{ sup.rol }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="reg_pass" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            6. Crea tu Contraseña (Mín. 8 caracteres) *
+                        </label>
+                        <input type="password"
+                               id="reg_pass"
+                               name="password"
+                               minlength="8"
+                               required
+                               placeholder="Mínimo 8 caracteres..."
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                    </div>
+
+                    <div>
+                        <label for="reg_pass2" class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                            7. Repite tu Contraseña *
+                        </label>
+                        <input type="password"
+                               id="reg_pass2"
+                               name="password2"
+                               minlength="8"
+                               required
+                               placeholder="Confirma la contraseña..."
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- Campo de Clave de Autorización Directiva (Siempre Visible) -->
+                <div class="p-4 rounded-xl bg-amber-50/90 border border-amber-300/80 space-y-1.5 shadow-sm">
+                    <label for="reg_maestra" class="block text-[11px] font-extrabold uppercase text-amber-950">
+                        8. Clave de Autorización Directiva (Contraseña Maestra o de Jefatura) *
+                    </label>
+                    <p class="text-[11px] text-amber-900 leading-relaxed">
+                        Ingresa la Contraseña Maestra directiva o la clave de acceso de tu Jefe de Área para avalar la creación de tu usuario.
+                    </p>
+                    <input type="password"
+                           id="reg_maestra"
+                           name="clave_maestra"
+                           required
+                           placeholder="Ingresa clave directiva de autorización..."
+                           class="w-full px-3.5 py-2.5 rounded-xl border border-amber-400 bg-white text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none transition">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit"
+                            class="w-full py-3 px-5 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider shadow-md hover:shadow-lg transition">
+                        Registrar Cuenta e Iniciar Sesión
+                    </button>
+                </div>
+            </form>
+
+            <div class="pt-3 border-t border-slate-200 text-center">
+                <a href="/login" class="text-xs font-extrabold text-[#002060] hover:underline">
+                    ¿Ya tienes una cuenta registrada? Inicia sesión aquí
+                </a>
+            </div>
         </div>
     </div>
-
-    <form method="post" action="/registro" class="p-5 sm:p-6 space-y-4">
-        {% if error %}
-        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3 rounded-lg text-xs font-bold">
-            {{ error }}
-        </div>
-        {% endif %}
-
-        <div>
-            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nombre y Apellido Completo</label>
-            <input type="text" name="nombre" value="{{ v.get('nombre', '') }}" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Usuario de Acceso</label>
-                <input type="text" name="username" value="{{ v.get('username', '') }}" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
-            </div>
-            <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Correo Corporativo</label>
-                <input type="email" name="email" value="{{ v.get('email', '') }}" placeholder="usuario@flylogistic.aero" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
-            </div>
-        </div>
-
-        <div>
-            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Superior / Jefe de Área Asignado</label>
-            <select name="jefe_id" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-white font-semibold">
-                <option value="">Seleccionar Superior Directo</option>
-                {% for s in superiores %}
-                <option value="{{ s.id }}" {% if v.get('jefe_id') == (s.id ~ '') %}selected{% endif %}>{{ s.nombre }} ({{ s.rol }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Contraseña</label>
-                <input type="password" name="password" placeholder="Mínimo 8 caracteres" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Confirmar Contraseña</label>
-                <input type="password" name="password2" placeholder="Repetir contraseña" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm">
-            </div>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 p-3.5 rounded-xl">
-            <label class="block text-xs font-bold uppercase text-[#002060] mb-1">Clave de Autorización Directiva</label>
-            <input type="password" name="clave_maestra" placeholder="Ingrese la clave directiva (FLY01)" required class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-white">
-        </div>
-
-        <button type="submit" class="w-full fly-bg fly-hover text-white font-extrabold py-3 rounded-lg text-xs uppercase tracking-wider shadow transition">
-            Completar Registro Corporativo
-        </button>
-
-        <div class="text-center pt-2">
-            <a href="/login" class="text-xs font-bold text-blue-700 hover:underline">Volver al Inicio de Sesión</a>
-        </div>
-    </form>
 </div>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

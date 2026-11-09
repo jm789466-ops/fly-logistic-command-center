@@ -1,26 +1,38 @@
-<<<<<<< HEAD
-# Entornos virtuales
+# Entornos virtuales Python
 venv/
+env/
+.venv/
+ENV/
+
+# Byte-code y caché de Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
 
-# Base de datos local de pruebas (opcional, si prefieres que producción use su propia BD)
-# pedidos.db
-
-# Credenciales de Google Drive y configuraciones SMTP privadas
+# Seguridad y Credenciales Privadas (NUNCA SUBIR A REPOSITORIOS)
+.secret_key
 token.json
 correo_config.json
+correo_config.json.json
 
-# Directorio de reportes locales temporales
-=======
-venv/
-__pycache__/
-*.pyc
-token.json
-correo_config.json
->>>>>>> 625340b0b9f49a31036875c592cb05b1e0db5bcc
+# Archivos de Base de Datos Temporales y Respaldos
+*.db-shm
+*.db-wal
+pedidos_respaldo_*.db
+
+# Directorios de Salida y Generación en Tiempo de Ejecución
 Pedidos Nacionales/
 Pedidos Internacionales/
 Consolidados_Usuarios/
 Reportes_Gerenciales/
-.secret_key
+Cotizaciones/
+
+# Editores y Sistema Operativo
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

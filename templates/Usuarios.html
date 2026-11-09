@@ -1,223 +1,278 @@
 {% extends "base.html" %}
+{% block title %}Gestión de Usuarios y Permisos — Fly Logistic{% endblock %}
+
 {% block content %}
-<div class="mb-5">
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
-        <div>
-            <h2 class="text-lg sm:text-xl font-extrabold fly-text">Gestión de Usuarios y Permisos</h2>
-            <p class="text-xs text-slate-500">Administración de cuentas corporativas, cargos, supervisores y política horaria de seguridad</p>
-        </div>
-        <div class="bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl text-xs text-amber-900 font-semibold flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-            <span>Restricción Horaria Activa: Rol <strong>Asesor</strong> habilitado para crear/editar POs hasta las <strong>5:30 p.m.</strong></span>
-        </div>
-    </div>
+<div class="max-w-7xl mx-auto space-y-5" x-data="{ modalCrear: false }">
 
-    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-    <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-[#002060]">
-        <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060] mb-3">Registrar Nuevo Colaborador</h3>
-        <form action="/gestion_usuarios/accion" method="post" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
-            <input type="hidden" name="accion" value="crear">
-            <div class="lg:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Nombre Completo</label>
-                <input type="text" name="nombre" placeholder="Nombre y apellido" required class="h-9 border border-slate-300 px-2.5 rounded-lg w-full text-xs">
-            </div>
-            <div class="lg:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Usuario (Login)</label>
-                <input type="text" name="username" placeholder="Ej. lgarzon" required class="h-9 border border-slate-300 px-2.5 rounded-lg w-full text-xs">
-            </div>
-            <div class="lg:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Correo Corporativo</label>
-                <input type="email" name="email" placeholder="correo@flylogistic.aero" required class="h-9 border border-slate-300 px-2.5 rounded-lg w-full text-xs">
-            </div>
-            <div class="lg:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Contraseña Inicial</label>
-                <input type="password" name="password" placeholder="Mínimo 8 caracteres" required class="h-9 border border-slate-300 px-2.5 rounded-lg w-full text-xs">
-            </div>
-            {% if user.rol in ['Administrador', 'Gerencia'] %}
-            <div class="lg:col-span-1">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Cargo</label>
-                <select name="rol" class="h-9 border border-slate-300 px-2 rounded-lg w-full text-xs bg-white font-semibold">
-                    {% for r in roles_sistema %}
-                    <option value="{{ r }}" {% if r == 'Asesor' %}selected{% endif %}>{{ r }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="lg:col-span-2">
-                <label class="block text-[10px] font-bold text-slate-600 mb-1">Superior Directo</label>
-                <select name="jefe_id" class="h-9 border border-slate-300 px-2 rounded-lg w-full text-xs bg-white truncate">
-                    <option value="">Directo</option>
-                    {% for j in jefes_disponibles %}
-                    <option value="{{ j.id }}">{{ j.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="lg:col-span-1">
-                <button type="submit" class="w-full h-9 fly-bg fly-hover text-white px-2 rounded-lg font-bold text-xs uppercase tracking-wider shadow-sm transition">
-                    Crear
-                </button>
-            </div>
-            {% else %}
-            <div class="lg:col-span-4">
-                <button type="submit" class="w-full h-9 fly-bg fly-hover text-white px-3 rounded-lg font-bold text-xs uppercase tracking-wider shadow-sm transition">
-                    Registrar Colaborador
-                </button>
-            </div>
-            {% endif %}
-        </form>
-    </div>
-    {% endif %}
-</div>
-
-<!-- VISTA MÓVIL USUARIOS -->
-<div class="lg:hidden space-y-3">
-    {% for u in usuarios %}
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3 text-xs">
-        <div class="flex justify-between items-start">
+    <!-- 1. ENCABEZADO DEL PANEL DE ADMINISTRACIÓN DE USUARIOS -->
+    <div class="fly-card p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div>
-                <div class="font-extrabold text-slate-900 text-sm">{{ u.nombre }}</div>
-                <div class="text-slate-500">Usuario: <strong class="font-mono text-blue-900">{{ u.username }}</strong></div>
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                    <a href="/pedidos/consolidado/excel?asesor_id={{ u.id }}" class="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
-                        Descargar Consolidado Excel
-                    </a>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#002060] text-white">
+                        Control de Acceso y Roles (RBAC)
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-[#002060] border border-blue-200">
+                        {{ usuarios|length }} cuentas activas
+                    </span>
+                </div>
+                <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060]">
+                    Directorio de Usuarios, Cargos y Permisos Operativos
+                </h1>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Administra los accesos del equipo Fly Logistic. Configura perfiles comerciales, supervisores, directivos y el rol exclusivo de Almacenista para control de bodega.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button"
+                        @click="modalCrear = true"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs shadow-sm transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>Crear Nuevo Usuario</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Guía rápida de niveles de acceso -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-4 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Rol: Asesor Comercial</span>
+                <p class="text-slate-600 mt-0.5">
+                    Gestiona sus propias órdenes y cotizaciones dentro del horario laboral habitual (hasta las 05:30 p.m.).
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-300">
+                <span class="text-[10px] font-extrabold uppercase text-emerald-900 block">Rol: Almacenista</span>
+                <p class="text-emerald-800 mt-0.5">
+                    Acceso exclusivo a Inventario y Bodega Aeronáutica (3 Warehouses, pistola Tera HW0009 y despacho).
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Rol: Jefe de Área</span>
+                <p class="text-slate-600 mt-0.5">
+                    Supervisa a los asesores y almacén, reasigna órdenes y autoriza trabajo hasta las 09:00 p.m.
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Rol: Gerencia</span>
+                <p class="text-slate-600 mt-0.5">
+                    Acceso global a analítica SLA, reactivación de órdenes canceladas y extensión hasta las 09:00 p.m.
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Rol: Administrador</span>
+                <p class="text-slate-600 mt-0.5">
+                    Control total de usuarios, contraseñas maestras, configuración SMTP y operación 24/7 sin restricción.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. LISTADO DE CUENTAS Y FORMULARIOS DE ACTUALIZACIÓN PASO A PASO -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {% for u in usuarios %}
+        <div class="fly-card p-5 space-y-4 border-l-4 {% if u.rol == 'Administrador' %}border-l-[#002060]{% elif u.rol == 'Gerencia' %}border-l-amber-500{% elif u.rol == 'Jefe de area' %}border-l-sky-600{% else %}border-l-emerald-600{% endif %}">
+            <!-- Encabezado de la tarjeta del usuario -->
+            <div class="flex flex-wrap items-start justify-between gap-2 pb-3 border-b border-slate-200">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-extrabold text-[#002060]">{{ u.nombre }}</h2>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase
+                            {% if u.rol == 'Administrador' %}bg-[#002060] text-white
+                            {% elif u.rol == 'Gerencia' %}bg-amber-100 text-amber-900 border border-amber-300
+                            {% elif u.rol == 'Jefe de area' %}bg-sky-100 text-sky-900 border border-sky-300
+                            {% else %}bg-emerald-100 text-emerald-900 border border-emerald-300{% endif %}">
+                            {{ u.rol }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Usuario de ingreso: <strong class="font-mono-code text-slate-800">{{ u.username }}</strong>
+                        · Correo: <strong class="text-slate-700">{{ u.email or 'Sin correo registrado' }}</strong>
+                    </p>
+                </div>
+                <div class="text-right text-[11px] text-slate-500">
+                    <span>Órdenes: <strong class="text-[#002060]">{{ u.pedidos|length }}</strong></span>
                 </div>
             </div>
-            <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 font-bold border border-blue-200">{{ u.rol }}</span>
+
+            <!-- Acción 1: Cambiar nombre visible y usuario de acceso -->
+            <form method="post" action="/gestion_usuarios/accion" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                <input type="hidden" name="accion" value="modificar_identidad">
+                <div class="sm:col-span-5">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">Nombre Completo</label>
+                    <input type="text" name="nuevo_nombre" value="{{ u.nombre }}" required
+                           class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white">
+                </div>
+                <div class="sm:col-span-4">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">Usuario de Acceso</label>
+                    <input type="text" name="nuevo_username" value="{{ u.username }}" required
+                           class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono-code font-bold bg-white">
+                </div>
+                <div class="sm:col-span-3">
+                    <button type="submit"
+                            class="w-full bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-1.5 px-3 rounded-lg text-[11px] transition">
+                        Guardar Nombre
+                    </button>
+                </div>
+            </form>
+
+            <!-- Acción 2: Actualizar correo electrónico -->
+            <form method="post" action="/gestion_usuarios/accion" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                <input type="hidden" name="accion" value="modificar_correo">
+                <div class="sm:col-span-9">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">Correo Electrónico Corporativo</label>
+                    <input type="email" name="nuevo_correo" value="{{ u.email or '' }}" required
+                           placeholder="correo@flylogistic.com"
+                           class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                </div>
+                <div class="sm:col-span-3">
+                    <button type="submit"
+                            class="w-full bg-[#1B4F9C] hover:bg-[#002060] text-white font-extrabold py-1.5 px-3 rounded-lg text-[11px] transition">
+                        Guardar Correo
+                    </button>
+                </div>
+            </form>
+
+            <!-- Acción 3: Modificar Cargo Operativo y Jefe Inmediato -->
+            <form method="post" action="/gestion_usuarios/accion" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                <input type="hidden" name="accion" value="modificar_rol_jefe">
+                <div class="sm:col-span-4">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">Cargo / Rol en el Sistema</label>
+                    <select name="nuevo_rol" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white">
+                        {% for r in (roles_sistema or roles_disponibles or ['Asesor', 'Jefe de area', 'Gerencia', 'Administrador']) %}
+                        <option value="{{ r }}" {% if u.rol == r %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="sm:col-span-5">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">Jefe de Área Asignado</label>
+                    <select name="nuevo_jefe_id" class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        <option value="">Asignación directa a Gerencia</option>
+                        {% for j in jefes_disponibles %}
+                            {% if j.id != u.id %}
+                            <option value="{{ j.id }}" {% if u.jefe_id == j.id %}selected{% endif %}>{{ j.nombre }} ({{ j.rol }})</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="sm:col-span-3">
+                    <button type="submit"
+                            class="w-full bg-slate-800 hover:bg-slate-950 text-white font-extrabold py-1.5 px-3 rounded-lg text-[11px] transition">
+                        Asignar Rol
+                    </button>
+                </div>
+            </form>
+
+            <!-- Acción 4: Asignar nueva contraseña directa -->
+            <form method="post" action="/gestion_usuarios/accion" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                <input type="hidden" name="usuario_id" value="{{ u.id }}">
+                <input type="hidden" name="accion" value="cambiar_clave">
+                <div class="sm:col-span-9">
+                    <label class="block text-[10px] font-extrabold uppercase text-amber-900 mb-1">
+                        Restablecer Contraseña (Mínimo 8 caracteres)
+                    </label>
+                    <input type="password" name="nueva_clave" minlength="8" required
+                           placeholder="Escribe la nueva contraseña para {{ u.nombre }}..."
+                           class="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs bg-white">
+                </div>
+                <div class="sm:col-span-3">
+                    <button type="submit"
+                            class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-1.5 px-3 rounded-lg text-[11px] transition">
+                        Cambiar Clave
+                    </button>
+                </div>
+            </form>
         </div>
+        {% else %}
+        <div class="col-span-full fly-card p-8 text-center text-xs text-slate-500">
+            No se encontraron usuarios disponibles bajo tu nivel de supervisión.
+        </div>
+        {% endfor %}
+    </div>
 
-        {% if u.username != 'admin' and user.rol in ['Administrador', 'Gerencia'] %}
-        <form action="/gestion_usuarios/accion" method="post" class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 m-0">
-            <input type="hidden" name="usuario_id" value="{{ u.id }}">
-            <input type="hidden" name="accion" value="modificar_rol_jefe">
-            <select name="nuevo_rol" class="h-9 border border-slate-300 px-2 rounded-lg text-xs bg-white font-semibold">
-                {% for r in roles_sistema %}
-                <option value="{{ r }}" {% if u.rol == r %}selected{% endif %}>{{ r }}</option>
-                {% endfor %}
-            </select>
-            <select name="nuevo_jefe_id" class="h-9 border border-slate-300 px-2 rounded-lg text-xs bg-white">
-                <option value="">Directo</option>
-                {% for j in jefes_disponibles %}
-                <option value="{{ j.id }}" {% if u.jefe_id == j.id %}selected{% endif %}>{{ j.nombre }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="h-9 bg-blue-600 text-white rounded-lg font-bold">Actualizar Cargo</button>
-        </form>
-        {% endif %}
+    <!-- Modal para Crear Nuevo Usuario -->
+    <div x-show="modalCrear"
+         x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+         style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden transform transition-all"
+             @click.away="modalCrear = false">
+            <div class="bg-gradient-to-r from-[#002060] to-[#003399] p-5 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-extrabold tracking-tight">Alta de Nuevo Usuario</h3>
+                    <p class="text-xs text-blue-200 mt-0.5">Registra colaboradores con credenciales y perfil operativo asignado.</p>
+                </div>
+                <button type="button" @click="modalCrear = false" class="text-white/80 hover:text-white p-1 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
 
-        <form action="/gestion_usuarios/accion" method="post" class="flex gap-2 m-0">
-            <input type="hidden" name="usuario_id" value="{{ u.id }}">
-            <input type="hidden" name="accion" value="modificar_correo">
-            <input type="email" name="nuevo_correo" value="{{ u.email or '' }}" required class="h-9 border border-slate-300 px-2.5 rounded-lg text-xs flex-1">
-            <button type="submit" class="h-9 bg-slate-700 text-white px-3 rounded-lg font-bold">Guardar Correo</button>
-        </form>
+            <form method="post" action="/gestion_usuarios/accion" class="p-6 space-y-4">
+                <input type="hidden" name="accion" value="crear">
 
-        <div class="flex gap-2 items-center">
-            <form action="/gestion_usuarios/accion" method="post" class="flex gap-2 flex-1 m-0">
-                <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                <input type="hidden" name="accion" value="modificar_clave">
-                <input type="password" name="nueva_clave" placeholder="Nueva contraseña (mín. 8)" required class="h-9 border border-slate-300 px-2.5 rounded-lg text-xs flex-1">
-                <button type="submit" class="h-9 bg-amber-500 text-white px-3 rounded-lg font-bold">Cambiar Clave</button>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Nombre y Apellido Completo *</label>
+                    <input type="text" name="nombre" required minlength="3" placeholder="Ej. Carlos Andrés Gómez"
+                           class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Usuario para Ingreso *</label>
+                        <input type="text" name="username" required minlength="3" placeholder="Ej. carlos.gomez"
+                               class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Correo Electrónico *</label>
+                        <input type="email" name="email" required placeholder="carlos@flylogistic.com"
+                               class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Rol / Cargo Asignado *</label>
+                        <select name="rol" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                            {% for r in (roles_sistema or roles_disponibles or ['Asesor', 'Almacenista', 'Jefe de area', 'Gerencia', 'Administrador']) %}
+                            <option value="{{ r }}" {% if r == 'Asesor' %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-[10px] text-slate-500 mt-1">Almacenista: Acceso exclusivo a Inventario.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Jefe Directo Asignado</label>
+                        <select name="jefe_id" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                            <option value="">Asignación directa a Gerencia</option>
+                            {% for j in jefes_disponibles %}
+                            <option value="{{ j.id }}">{{ j.nombre }} ({{ j.rol }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Contraseña Inicial (Mínimo 8 caracteres) *</label>
+                    <input type="password" name="password" required minlength="8" placeholder="Contraseña de acceso seguro..."
+                           class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#002060] focus:border-[#002060] transition">
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="modalCrear = false"
+                            class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold px-5 py-2 rounded-xl text-xs shadow-md hover:shadow-lg transition">
+                        Crear y Activar Usuario
+                    </button>
+                </div>
             </form>
-            {% if u.id != user.id and u.username != 'admin' %}
-            <form action="/gestion_usuarios/accion" method="post" onsubmit="return confirm('¿Confirmar baja de {{ u.nombre }}?');" class="m-0">
-                <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                <input type="hidden" name="accion" value="eliminar">
-                <button type="submit" class="h-9 bg-red-600 text-white px-3 rounded-lg font-bold">Eliminar</button>
-            </form>
-            {% endif %}
         </div>
     </div>
-    {% endfor %}
+
 </div>
-
-<!-- VISTA ESCRITORIO USUARIOS -->
-<div class="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-    <table class="w-full table-fixed divide-y divide-slate-200 text-xs">
-        <thead class="fly-bg text-white text-[11px] uppercase tracking-wider">
-            <tr class="divide-x divide-blue-900/40">
-                <th class="w-[18%] px-4 py-3 text-left">Colaborador</th>
-                <th class="w-[34%] px-4 py-3 text-left">Cargo y Superior</th>
-                <th class="w-[22%] px-4 py-3 text-left">Correo Electrónico</th>
-                <th class="w-[18%] px-4 py-3 text-left">Restablecer Clave</th>
-                <th class="w-[8%] px-4 py-3 text-center">Estado</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-            {% for u in usuarios %}
-            <tr class="hover:bg-slate-50 divide-x divide-slate-100 align-middle">
-                <td class="px-4 py-3 break-words">
-                    <div class="font-extrabold text-slate-900">{{ u.nombre }}</div>
-                    <div class="text-[11px] text-slate-500">Usuario: <span class="font-mono font-bold text-blue-900">{{ u.username }}</span></div>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                        <a href="/pedidos/consolidado/excel?asesor_id={{ u.id }}" class="text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
-                            Excel Cartera
-                        </a>
-                        {% if u.rol == 'Asesor' %}
-                        <span class="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded" title="Restricción horaria 5:30 p.m.">Límite 5:30 PM</span>
-                        {% endif %}
-                    </div>
-                </td>
-
-                <td class="px-4 py-3">
-                    {% if u.username == 'admin' %}
-                    <span class="px-3 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-300 inline-block">
-                        Administrador General
-                    </span>
-                    {% elif user.rol in ['Administrador', 'Gerencia'] %}
-                    <form action="/gestion_usuarios/accion" method="post" class="grid grid-cols-12 gap-1.5 items-center m-0">
-                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                        <input type="hidden" name="accion" value="modificar_rol_jefe">
-                        <select name="nuevo_rol" class="col-span-5 h-9 border border-slate-300 px-2 rounded-lg text-xs bg-white font-semibold">
-                            {% for r in roles_sistema %}
-                            <option value="{{ r }}" {% if u.rol == r %}selected{% endif %}>{{ r }}</option>
-                            {% endfor %}
-                        </select>
-                        <select name="nuevo_jefe_id" class="col-span-5 h-9 border border-slate-300 px-2 rounded-lg text-xs bg-white truncate">
-                            <option value="">Directo</option>
-                            {% for j in jefes_disponibles %}
-                            <option value="{{ j.id }}" {% if u.jefe_id == j.id %}selected{% endif %}>{{ j.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="col-span-2 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold">Guardar</button>
-                    </form>
-                    {% else %}
-                    <span class="px-2.5 py-0.5 text-xs rounded-full bg-blue-50 text-blue-800 font-bold border border-blue-200">{{ u.rol }}</span>
-                    <span class="text-[11px] text-slate-500 block mt-0.5">Superior: {{ u.jefe.nombre if u.jefe else 'Directo' }}</span>
-                    {% endif %}
-                </td>
-
-                <td class="px-4 py-3">
-                    <form action="/gestion_usuarios/accion" method="post" class="flex gap-1.5 items-center m-0">
-                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                        <input type="hidden" name="accion" value="modificar_correo">
-                        <input type="email" name="nuevo_correo" value="{{ u.email or '' }}" required class="h-9 border border-slate-300 px-2.5 rounded-lg text-xs w-full">
-                        <button type="submit" class="h-9 bg-slate-700 hover:bg-slate-800 text-white px-3 rounded-lg text-xs font-bold shrink-0">Guardar</button>
-                    </form>
-                </td>
-
-                <td class="px-4 py-3">
-                    <form action="/gestion_usuarios/accion" method="post" class="flex gap-1.5 items-center m-0">
-                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                        <input type="hidden" name="accion" value="modificar_clave">
-                        <input type="password" name="nueva_clave" placeholder="Mínimo 8 caracteres" required class="h-9 border border-slate-300 px-2.5 rounded-lg text-xs w-full">
-                        <button type="submit" class="h-9 bg-amber-500 hover:bg-amber-600 text-white px-3 rounded-lg text-xs font-bold shrink-0">Aplicar</button>
-                    </form>
-                </td>
-
-                <td class="px-4 py-3 text-center">
-                    {% if u.id != user.id and u.username != 'admin' %}
-                    <form action="/gestion_usuarios/accion" method="post" onsubmit="return confirm('¿Confirmar baja de {{ u.nombre }}?');" class="inline m-0">
-                        <input type="hidden" name="usuario_id" value="{{ u.id }}">
-                        <input type="hidden" name="accion" value="eliminar">
-                        <button type="submit" class="h-9 bg-red-600 hover:bg-red-700 text-white px-3 rounded-lg text-xs font-bold">Eliminar</button>
-                    </form>
-                    {% else %}
-                    <span class="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">Activo</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

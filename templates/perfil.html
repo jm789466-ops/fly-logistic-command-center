@@ -1,85 +1,319 @@
 {% extends "base.html" %}
+{% block title %}Mi Perfil y Configuración — Fly Logistic{% endblock %}
+
 {% block content %}
-<div class="max-w-3xl mx-auto space-y-6">
-    <h2 class="text-lg sm:text-2xl font-extrabold fly-text">Configuración de Cuenta y Parámetros de Notificación</h2>
+<div class="max-w-6xl mx-auto space-y-5">
+
+    <!-- 1. ENCABEZADO DEL PERFIL DE USUARIO -->
+    <div class="fly-card p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#002060] text-white">
+                        Configuración de Cuenta Personal
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-100 text-sky-900 border border-sky-200">
+                        Cargo Actual: {{ user.rol }}
+                    </span>
+                </div>
+                <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060]">
+                    Hola, {{ user.nombre }} — Administración de tu Perfil
+                </h1>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Actualiza tus datos de contacto, cambia tu contraseña personal y gestiona las autorizaciones para trabajar fuera del horario habitual.
+                </p>
+            </div>
+            <a href="/pedidos"
+               class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition shrink-0">
+                Volver al Centro de Operaciones
+            </a>
+        </div>
+    </div>
+
     {% if error %}
-    <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 rounded text-xs font-semibold">{{ error }}</div>
+    <div class="fly-card p-4 border-l-4 border-l-rose-600 bg-rose-50/80 text-rose-950 text-xs sm:text-sm font-bold">
+        {{ error }}
+    </div>
     {% endif %}
 
-    <div class="bg-white shadow-sm border border-slate-200 rounded-xl p-5 sm:p-6">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div>
-                <span class="text-xs uppercase font-bold text-slate-400 block">Titular de la Cuenta</span>
-                <span class="font-extrabold text-slate-900">{{ user.nombre }}</span>
+    <!-- 2. DATOS DE CONTACTO Y CAMBIO DE CONTRASEÑA -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Actualizar correo y teléfono -->
+        <div class="fly-card p-5 sm:p-6 space-y-4">
+            <div class="pb-3 border-b border-slate-200">
+                <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                    1. Datos de Contacto de tu Cuenta
+                </h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                    Mantén tu correo electrónico y teléfono actualizados para recibir alertas de vencimiento y enlaces de seguridad.
+                </p>
             </div>
-            <div>
-                <span class="text-xs uppercase font-bold text-slate-400 block">Usuario de Acceso</span>
-                <span class="font-mono font-bold text-blue-900">{{ user.username }}</span>
+
+            <form method="post" action="/perfil/datos" class="space-y-3.5 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">Nombre Registrado</label>
+                        <input type="text" value="{{ user.nombre }}" readonly
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-100 text-slate-600 font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-500 mb-1">Usuario de Acceso</label>
+                        <input type="text" value="{{ user.username }}" readonly
+                               class="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 font-mono-code font-bold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">
+                        Correo Electrónico Corporativo *
+                    </label>
+                    <input type="email" name="email" value="{{ user.email or '' }}" required
+                           placeholder="tucorreo@flylogistic.aero"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">
+                        Teléfono o Celular de Contacto
+                    </label>
+                    <input type="text" name="telefono" value="{{ user.telefono or '' }}"
+                           placeholder="Ej. +57 300 000 0000"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                    <button type="submit"
+                            class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2.5 px-5 rounded-xl text-xs shadow-sm transition">
+                        Guardar Datos de Contacto
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Cambiar contraseña de acceso -->
+        <div class="fly-card p-5 sm:p-6 space-y-4">
+            <div class="pb-3 border-b border-slate-200">
+                <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                    2. Cambiar tu Contraseña de Ingreso
+                </h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                    Escribe tu contraseña actual y luego define la nueva clave de al menos 8 caracteres.
+                </p>
             </div>
+
+            <form method="post" action="/perfil/clave" class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">
+                        Contraseña Actual *
+                    </label>
+                    <input type="password" name="actual" required
+                           placeholder="Escribe tu contraseña actual..."
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">
+                            Nueva Contraseña (Mín. 8 caracteres) *
+                        </label>
+                        <input type="password" name="password" minlength="8" required
+                               placeholder="Nueva contraseña..."
+                               class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">
+                            Repetir Nueva Contraseña *
+                        </label>
+                        <input type="password" name="password2" minlength="8" required
+                               placeholder="Confirma la nueva contraseña..."
+                               class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs">
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end">
+                    <button type="submit"
+                            class="bg-[#1B4F9C] hover:bg-[#002060] text-white font-extrabold py-2.5 px-5 rounded-xl text-xs shadow-sm transition">
+                        Actualizar Contraseña
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. CONTRASEÑAS MAESTRAS DE HORARIO EXTENDIDO -->
+    {% if user.rol in ['Jefe de area', 'Gerencia', 'Administrador'] %}
+    <div class="fly-card p-5 sm:p-6 space-y-4 border-l-4 border-l-amber-500">
+        <div class="pb-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <span class="text-xs uppercase font-bold text-slate-400 block">Cargo</span>
-                <span class="bg-blue-100 text-blue-800 px-3 py-0.5 rounded-full text-xs font-extrabold">{{ user.rol }}</span>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
+                    Autorización Directiva de Jornada
+                </span>
+                <h2 class="text-sm sm:text-base font-extrabold text-[#002060] mt-0.5">
+                    Contraseñas maestras para trabajar fuera de horario
+                </h2>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Genera códigos temporales seguros (formato FLY-XXXX-XXXX) para que un asesor pueda registrar o editar órdenes después de las 5:30 p.m. (hora oficial de Bogotá).
+                </p>
             </div>
         </div>
 
-        <form action="/perfil/correo" method="post" class="border-t pt-4">
-            <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Correo Corporativo para Recepción de Alertas</label>
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input type="email" name="email" value="{{ user.email or '' }}" placeholder="usuario@flylogistic.aero" required class="flex-grow h-10 border border-slate-300 px-3 rounded-lg text-sm">
-                <button type="submit" class="h-10 fly-bg fly-hover text-white px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Actualizar Correo</button>
+        {% if clave_horario_nueva %}
+        <div class="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 space-y-1">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 block">
+                Nueva Contraseña Maestra Generada (Cópiala ahora, solo se muestra una vez)
+            </span>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <code class="text-lg sm:text-xl font-extrabold font-mono-code text-[#002060] bg-white px-3.5 py-1.5 rounded-xl border border-emerald-300">
+                    {{ clave_horario_nueva.codigo }}
+                </code>
+                <div class="text-xs text-emerald-900">
+                    Autorizada para: <strong>{{ clave_horario_nueva.destino }}</strong> · Vence: <strong>{{ clave_horario_nueva.expira }}</strong>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/perfil/clave_horario/generar" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div class="sm:col-span-4">
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Asesor Beneficiario</label>
+                <select name="asesor_destino_id" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white">
+                    <option value="">Cualquier asesor del equipo</option>
+                    {% for a in (asesores_para_clave or []) %}
+                    <option value="{{ a.id }}">{{ a.nombre }} ({{ a.username }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Duración del Permiso</label>
+                <select name="vigencia_horas" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white">
+                    {% for vh in (vigencias_clave or [1, 2, 3, 4]) %}
+                    <option value="{{ vh }}">{{ vh }} hora(s)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="sm:col-span-3">
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Motivo de la Autorización</label>
+                <input type="text" name="motivo" placeholder="Ej. Cierre urgente de PO..."
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-white">
+            </div>
+            <div class="sm:col-span-2">
+                <button type="submit"
+                        class="w-full bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2 px-3 rounded-xl text-xs shadow-sm transition">
+                    Generar Código
+                </button>
             </div>
         </form>
-    </div>
 
-    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-    <div class="bg-white shadow-sm border border-slate-200 border-t-4 border-t-[#002060] rounded-xl p-5 sm:p-6">
-        <h3 class="text-sm font-extrabold uppercase text-[#002060] mb-1">Configuración del Servidor de Correo Saliente (SMTP)</h3>
-        <p class="text-xs text-slate-500 mb-4">Parámetros técnicos para el despacho de alertas operativas de órdenes de compra.</p>
-        <form action="/perfil/smtp" method="post" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="sm:col-span-2">
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Servidor SMTP (Host)</label>
-                    <input type="text" name="smtp_host" value="{{ cfg_smtp.get('host', '') }}" placeholder="mail.flylogistic.aero" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Puerto (465 SSL / 587 TLS)</label>
-                    <input type="number" name="smtp_port" value="{{ cfg_smtp.get('port', 465) }}" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Cuenta Emisora</label>
-                    <input type="email" name="smtp_user" value="{{ cfg_smtp.get('user', '') }}" placeholder="notificaciones@flylogistic.aero" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Contraseña SMTP</label>
-                    <input type="password" name="smtp_pass" value="{{ cfg_smtp.get('password', '') }}" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required>
-                </div>
+        {% if claves_horario %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase">
+                        <th class="py-2.5 px-3">Terminación</th>
+                        <th class="py-2.5 px-3">Asesor Destino</th>
+                        <th class="py-2.5 px-3">Motivo</th>
+                        <th class="py-2.5 px-3">Vence (Bogotá)</th>
+                        <th class="py-2.5 px-3">Estado</th>
+                        <th class="py-2.5 px-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for ch in claves_horario %}
+                    <tr>
+                        <td class="py-2 px-3 font-mono-code font-bold text-[#002060]">FLY-****-{{ ch.sufijo }}</td>
+                        <td class="py-2 px-3 font-semibold">{{ ch.destino }}</td>
+                        <td class="py-2 px-3 text-slate-600">{{ ch.motivo or 'Autorización operativa' }}</td>
+                        <td class="py-2 px-3 font-mono-code">{{ ch.expira }}</td>
+                        <td class="py-2 px-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold {% if ch.estado == 'Activa' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-600{% endif %}">
+                                {{ ch.estado }} ({{ ch.usos }} usos)
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 text-right">
+                            {% if ch.estado == 'Activa' %}
+                            <form method="post" action="/perfil/clave_horario/{{ ch.id }}/revocar" class="inline">
+                                <button type="submit" class="px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold">
+                                    Revocar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <!-- Formulario de desbloqueo de horario para Asesor -->
+    <div class="fly-card p-5 sm:p-6 space-y-3 border-l-4 border-l-[#002060]">
+        <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+            3. Habilitar Trabajo Fuera del Horario Habitual (Después de las 5:30 p.m.)
+        </h2>
+        <p class="text-xs text-slate-600">
+            Si necesitas registrar o modificar una orden fuera de tu jornada habitual, solicita a tu Jefe de Área, Gerencia o Administración un código maestro temporal (formato FLY-XXXX-XXXX) e ingrésalo aquí:
+        </p>
+        <form method="post" action="/horario/desbloquear" class="flex flex-col sm:flex-row gap-2.5">
+            <input type="hidden" name="next" value="/perfil">
+            <input type="text" name="clave_horario" required
+                   placeholder="Escribe el código FLY-XXXX-XXXX..."
+                   class="flex-1 px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono-code font-bold uppercase focus:ring-2 focus:ring-[#002060] focus:outline-none">
+            <button type="submit"
+                    class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2.5 px-5 rounded-xl text-xs shrink-0">
+                Activar Código Maestro
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- 4. CONFIGURACIÓN SMTP DE CORREO CORPORATIVO (SOLO ADMINISTRADOR) -->
+    {% if user.rol == 'Administrador' and cfg_smtp %}
+    <div class="fly-card p-5 sm:p-6 space-y-4">
+        <div class="pb-3 border-b border-slate-200">
+            <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                4. Servidor de Correo Saliente (SMTP) para Alertas y Recuperación
+            </h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">
+                Configura las credenciales del servidor de correo corporativo utilizado para enviar reportes y recordatorios automáticos.
+            </p>
+        </div>
+
+        <form method="post" action="/perfil/smtp" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end text-xs">
+            <div>
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Servidor SMTP</label>
+                <input type="text" name="smtp_host" value="{{ cfg_smtp.host }}" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Destinatario para Prueba de Envío:</label>
-                <input type="email" name="destino_prueba" value="{{ user.email or '' }}" placeholder="correo@flylogistic.aero" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm">
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Puerto</label>
+                <input type="number" name="smtp_port" value="{{ cfg_smtp.port }}" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button type="submit" name="accion_smtp" value="guardar" class="fly-bg fly-hover text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">
-                    Guardar Parámetros SMTP
+            <div>
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Cuenta Emisora</label>
+                <input type="text" name="smtp_user" value="{{ cfg_smtp.user }}" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+            </div>
+            <div>
+                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Contraseña SMTP</label>
+                <input type="password" name="smtp_pass" value="{{ cfg_smtp.password }}" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+            </div>
+            <div class="flex gap-1.5">
+                <button type="submit" name="accion_smtp" value="guardar"
+                        class="flex-1 bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2 px-3 rounded-xl text-xs">
+                    Guardar
                 </button>
-                <button type="submit" name="accion_smtp" value="probar" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
-                    Ejecutar Prueba de Envío
+                <button type="submit" name="accion_smtp" value="probar"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs">
+                    Probar
                 </button>
             </div>
         </form>
     </div>
     {% endif %}
 
-    <div class="bg-white shadow-sm border border-slate-200 rounded-xl p-5 sm:p-6">
-        <h3 class="text-sm font-bold uppercase text-[#002060] mb-4">Actualización de Contraseña Personal</h3>
-        <form action="/perfil/clave" method="post" class="space-y-4">
-            <div><label class="block text-xs font-semibold">Contraseña Actual</label><input type="password" name="actual" class="mt-1 w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required></div>
-            <div><label class="block text-xs font-semibold">Nueva Contraseña (mín. 8 caracteres)</label><input type="password" name="password" class="mt-1 w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required></div>
-            <div><label class="block text-xs font-semibold">Confirmar Nueva Contraseña</label><input type="password" name="password2" class="mt-1 w-full h-10 border border-slate-300 px-3 rounded-lg text-sm" required></div>
-            <button type="submit" class="fly-bg fly-hover text-white px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">Guardar Nueva Contraseña</button>
-        </form>
-    </div>
 </div>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

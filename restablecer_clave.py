@@ -22,7 +22,10 @@ def listar(db):
     if not filas:
         print("No hay usuarios registrados todavía.")
     for a in filas:
-        print(f"[{a.id}] nombre: {a.nombre!r} | usuario: {a.username!r} | correo: {a.email!r} | pedidos: {len(a.pedidos)}")
+        print(
+            f"[{a.id}] nombre: {a.nombre!r} | usuario: {a.username!r} | "
+            f"rol: {a.rol!r} | correo: {a.email!r} | pedidos: {len(a.pedidos)}"
+        )
 
 
 def buscar(db, texto):
@@ -48,39 +51,42 @@ def main_cli():
         cfg = main.config_correo()
         print(f"Servidor: {cfg.get('host')}:{cfg.get('port', 587)} | usuario: {cfg.get('user')}")
         ok = main.enviar_correo(args.correo, "Prueba de correo · OMS", "Si lees esto, el envío funciona.")
-        print("✔ Correo enviado. Revisa la bandeja (y spam)." if ok else "✘ No se envió. Revisa el mensaje de error de arriba.")
+        print("[OK] Correo enviado. Revisa la bandeja (y spam)." if ok else "[ERROR] No se envió. Revisa el mensaje de error de arriba.")
         return
 
     db = SessionLocal()
-    if not args.usuario:
-        listar(db)
-        return
-    cuentas = buscar(db, args.usuario)
-    if not cuentas:
-        print(f"No encontré «{args.usuario}». Usuarios existentes:")
-        listar(db)
-        sys.exit(1)
-    if len(cuentas) > 1:
-        print("Hay varias coincidencias, sé más específico:")
-        for a in cuentas:
-            print(f"  - {a.nombre} (usuario: {a.username})")
-        sys.exit(1)
-    a = cuentas[0]
+    try:
+        if not args.usuario:
+            listar(db)
+            return
+        cuentas = buscar(db, args.usuario)
+        if not cuentas:
+            print(f"No encontré «{args.usuario}». Usuarios existentes:")
+            listar(db)
+            sys.exit(1)
+        if len(cuentas) > 1:
+            print("Hay varias coincidencias, sé más específico:")
+            for a in cuentas:
+                print(f"  - {a.nombre} (usuario: {a.username})")
+            sys.exit(1)
+        a = db.query(models.Asesor).with_for_update().filter(models.Asesor.id == cuentas[0].id).first()
 
-    clave = args.clave
-    if not clave:
-        clave = getpass.getpass(f"Nueva contraseña para {a.nombre}: ")
-        if clave != getpass.getpass("Repítela: "):
-            sys.exit("Las contraseñas no coinciden.")
-    if len(clave) < 8:
-        sys.exit("La contraseña debe tener al menos 8 caracteres.")
+        clave = args.clave
+        if not clave:
+            clave = getpass.getpass(f"Nueva contraseña para {a.nombre}: ")
+            if clave != getpass.getpass("Repítela: "):
+                sys.exit("Las contraseñas no coinciden.")
+        if len(clave) < 8:
+            sys.exit("La contraseña debe tener al menos 8 caracteres.")
 
-    a.password_hash = main.hash_clave(clave)
-    a.reset_token_hash, a.reset_expira = None, None
-    if not a.username:                      # asesor antiguo sin usuario
-        a.username = a.nombre_norm
-    db.commit()
-    print(f"✔ Contraseña actualizada. Inicia sesión con el usuario: {a.username}")
+        a.password_hash = main.hash_clave(clave)
+        a.reset_token_hash, a.reset_expira = None, None
+        if not a.username:                      # asesor antiguo sin usuario
+            a.username = a.nombre_norm
+        db.commit()
+        print(f"[OK] Contraseña actualizada. Inicia sesión con el usuario: {a.username}")
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

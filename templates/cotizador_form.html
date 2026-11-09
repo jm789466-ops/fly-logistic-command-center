@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+{% block title %}Elaborar Cotización Comercial V4 — Fly Logistic{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-5" x-data="cotizadorApp()">
+
+    <!-- ========================================================================= -->
+    <!-- 1. ENCABEZADO GUIADO DEL GENERADOR DE COTIZACIONES                        -->
+    <!-- ========================================================================= -->
+    <div class="fly-card p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#002060] text-white">
+                        Formato Oficial Versión 4 (.xlsx)
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        Cálculo Automático en Tiempo Real
+                    </span>
+                </div>
+                <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060]">
+                    Generador Guiado de Cotizaciones Comerciales
+                </h1>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Completa los datos del cliente y agrega los repuestos requeridos. Al guardar, el sistema almacena la cotización en el panel y descarga o convierte el documento inmediatamente.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="/cotizaciones"
+                   class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition">
+                    Ver Listado de Cotizaciones
+                </a>
+                <a href="/pedidos"
+                   class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition">
+                    Volver al Centro de Operaciones
+                </a>
+            </div>
+        </div>
+
+        <!-- Guía rápida de 3 pasos para cualquier usuario -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5 pt-4 border-t border-slate-200/80 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Paso 1: Moneda y Fechas</span>
+                <p class="text-slate-600 mt-0.5">
+                    Define el número de cotización, elige si cotizas en Pesos (COP) o Dólares (USD) y verifica la fecha de vencimiento.
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Paso 2: Datos del Cliente</span>
+                <p class="text-slate-600 mt-0.5">
+                    Escribe el nombre de la empresa o aerolínea, persona de contacto, teléfono, correo y condiciones comerciales.
+                </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span class="text-[10px] font-extrabold uppercase text-[#002060] block">Paso 3: Repuestos y Descarga</span>
+                <p class="text-slate-600 mt-0.5">
+                    Agrega cada referencia con su precio unitario, cargos Hazmat o Certificado, y elige si deseas guardar o descargar el Excel.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 2. FORMULARIO PRINCIPAL DE LA COTIZACIÓN                                  -->
+    <!-- ========================================================================= -->
+    <form method="post" action="/cotizador/generar" class="space-y-5">
+
+        <!-- BLOQUE A: IDENTIFICACIÓN, DIVISA Y VIGENCIA -->
+        <div class="fly-card p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-200">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                        1. Identificación de la Propuesta, Moneda y Plazo de Validez
+                    </h2>
+                    <p class="text-[11px] text-slate-500">
+                        Estos datos aparecerán en el encabezado superior de la plantilla oficial Excel Versión 4.
+                    </p>
+                </div>
+                <span class="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg bg-blue-50 text-[#002060] border border-blue-200"
+                      x-text="moneda === 'COP' ? 'Operación Nacional (COP)' : 'Operación Internacional (USD)'">
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Número de Cotización *
+                    </label>
+                    <input type="text"
+                           name="quote_number"
+                           value="{{ sugerencia_quote }}"
+                           required
+                           placeholder="Ej. Q-2026-001"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-extrabold text-[#002060] bg-blue-50/40 focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Moneda de Cotización *
+                    </label>
+                    <select name="moneda"
+                            x-model="moneda"
+                            @change="actualizarIvaPorMoneda()"
+                            class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-extrabold text-emerald-900 bg-emerald-50/50 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                        <option value="COP">COP ($ Pesos Colombianos)</option>
+                        <option value="USD">USD ($ Dólares Americanos)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Alcance de Operación
+                    </label>
+                    <select name="tipo_operacion"
+                            x-model="tipoOperacion"
+                            class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                        <option value="Nacional">Nacional</option>
+                        <option value="Internacional">Internacional</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Fecha de Emisión *
+                    </label>
+                    <input type="date"
+                           name="quote_date"
+                           value="{{ hoy }}"
+                           required
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Válida Hasta (Expiración) *
+                    </label>
+                    <input type="date"
+                           name="expiration_date"
+                           value="{{ expira_default }}"
+                           required
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Asesor Responsable / Elabora
+                    </label>
+                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
+                    <select name="asesor_id" class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                        {% for a in asesores_disponibles %}
+                        <option value="{{ a.id }}" {% if (d.get('asesor_id') == (a.id|string)) or (a.id == user.id) %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="prepared_by" value="{{ user.nombre }}">
+                    {% else %}
+                    <div class="relative">
+                        <input type="text" value="{{ user.nombre }}" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 cursor-not-allowed" readonly title="Campo bloqueado: cada asesor es responsable directo de sus registros">
+                        <span class="absolute right-3 top-2.5 text-[10px] font-extrabold text-slate-500 uppercase bg-slate-200 px-2 py-0.5 rounded">Asignado</span>
+                    </div>
+                    <input type="hidden" name="asesor_id" value="{{ user.id }}">
+                    <input type="hidden" name="prepared_by" value="{{ user.nombre }}">
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOQUE B: INFORMACIÓN DEL CLIENTE Y CONDICIONES COMERCIALES -->
+        <div class="fly-card p-5 sm:p-6">
+            <div class="pb-3 mb-4 border-b border-slate-200">
+                <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                    2. Datos de la Empresa Cliente, Contacto y Condiciones de Entrega
+                </h2>
+                <p class="text-[11px] text-slate-500">
+                    Indica a quién va dirigida la propuesta comercial y bajo qué condiciones de pago e Incoterm se entregará el material.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Empresa o Aerolínea Destinataria (To) *
+                    </label>
+                    <input type="text"
+                           name="to_company"
+                           list="clientes-dl"
+                           required
+                           placeholder="Escribe o selecciona la empresa cliente..."
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                    <datalist id="clientes-dl">
+                        {% for cli in clientes %}
+                        <option value="{{ cli }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Referencia del Cliente (Ref. No)
+                    </label>
+                    <input type="text"
+                           name="ref_no"
+                           placeholder="Ej. RFQ-8812 / Solicitud técnica"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Persona de Contacto (Attn)
+                    </label>
+                    <input type="text"
+                           name="contact"
+                           placeholder="Nombre del comprador o ingeniero..."
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Teléfono del Contacto
+                    </label>
+                    <input type="text"
+                           name="phone"
+                           placeholder="Ej. +57 300 000 0000"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Correo Electrónico del Cliente
+                    </label>
+                    <input type="email"
+                           name="email"
+                           placeholder="compras@empresa.com"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Ciudad / Sede de Entrega (Site)
+                    </label>
+                    <input type="text"
+                           name="site"
+                           placeholder="Ej. Bogotá D.C. / Miami FL"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Condiciones de Pago (Terms)
+                    </label>
+                    <input type="text"
+                           name="terms"
+                           placeholder="Ej. Contado / Crédito 30 días / Anticipo"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Incoterm aplicable
+                    </label>
+                    <input type="text"
+                           name="incoterm"
+                           placeholder="Ej. EXW, FOB, CIF, DDP..."
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label class="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
+                        Tiempo de Entrega Ofrecido (Delivery Time)
+                    </label>
+                    <input type="text"
+                           name="delivery_time"
+                           placeholder="Ej. 5 a 8 días hábiles tras recibir orden de compra confirmada"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOQUE C: TABLA DINÁMICA DE REPUESTOS E ÍTEMS COTIZADOS -->
+        <div class="fly-card p-5 sm:p-6 border border-slate-200 shadow-sm rounded-2xl bg-white">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-4 border-b border-slate-200">
+                <div>
+                    <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                        3. Detalle de Repuestos, Precios Unitarios, Cargos Especiales e Impuestos
+                    </h2>
+                    <p class="text-[11px] text-slate-500">
+                        Ingresa los repuestos requeridos con su precio y recargos opcionales (Hazmat o Certificados). Si el ítem no grava IVA, activa la casilla «Exento 0%».
+                    </p>
+                </div>
+                <button type="button"
+                        @click="agregarItem()"
+                        class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2 px-4 rounded-xl text-xs shadow-sm transition shrink-0 flex items-center gap-1.5">
+                    <span>+ Agregar Línea de Repuesto</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full text-left border-collapse min-w-[1020px]">
+                    <thead>
+                        <tr class="bg-[#002060] text-white text-[10px] font-extrabold uppercase tracking-wider">
+                            <th class="py-3 px-3 w-12 text-center">#</th>
+                            <th class="py-3 px-3">Part Number y Descripción del Repuesto *</th>
+                            <th class="py-3 px-2 w-20 text-center">Cant. *</th>
+                            <th class="py-3 px-2 w-24 text-center">Unidad</th>
+                            <th class="py-3 px-3 w-36 text-right">Precio Unitario (<span x-text="moneda"></span>) *</th>
+                            <th class="py-3 px-2 w-28 text-right">Hazmat</th>
+                            <th class="py-3 px-2 w-28 text-right">Certificado</th>
+                            <th class="py-3 px-2 w-36 text-center">IVA / Régimen</th>
+                            <th class="py-3 px-3 w-36 text-right">Total Línea (<span x-text="moneda"></span>)</th>
+                            <th class="py-3 px-3 w-40">Notas / Condición</th>
+                            <th class="py-3 px-2 w-10 text-center"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-xs bg-white">
+                        <template x-for="(it, idx) in items" :key="idx">
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="py-2.5 px-3 text-center font-extrabold text-slate-500 bg-slate-50/40" x-text="idx + 1"></td>
+
+                                <td class="py-2.5 px-3">
+                                    <input type="text"
+                                           name="part_number"
+                                           x-model="it.description"
+                                           required
+                                           placeholder="Part Number y descripción técnica..."
+                                           class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-[#002060] focus:border-transparent bg-white">
+                                </td>
+
+                                <td class="py-2.5 px-2">
+                                    <input type="number"
+                                           step="any"
+                                           min="0.01"
+                                           name="qty"
+                                           x-model.number="it.qty"
+                                           required
+                                           class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs font-bold text-center focus:ring-2 focus:ring-[#002060] bg-white">
+                                </td>
+
+                                <td class="py-2.5 px-2">
+                                    <select name="unit"
+                                            x-model="it.unit"
+                                            class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-[#002060]">
+                                        {% for u in unidades_medida %}
+                                        <option value="{{ u }}">{{ u }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+
+                                <td class="py-2.5 px-3">
+                                    <input type="number"
+                                           step="0.01"
+                                           min="0"
+                                           name="unit_price"
+                                           x-model.number="it.unit_price"
+                                           required
+                                           placeholder="0.00"
+                                           class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-xs font-bold text-right focus:ring-2 focus:ring-[#002060] bg-white">
+                                </td>
+
+                                <td class="py-2.5 px-2">
+                                    <input type="number"
+                                           step="0.01"
+                                           min="0"
+                                           name="cobro_hazmat"
+                                           x-model.number="it.hazmat"
+                                           placeholder="0.00"
+                                           class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs text-right bg-white focus:ring-2 focus:ring-[#002060]">
+                                </td>
+
+                                <td class="py-2.5 px-2">
+                                    <input type="number"
+                                           step="0.01"
+                                           min="0"
+                                           name="cobro_certificado"
+                                           x-model.number="it.certificado"
+                                           placeholder="0.00"
+                                           class="w-full px-2 py-2 border border-slate-300 rounded-lg text-xs text-right bg-white focus:ring-2 focus:ring-[#002060]">
+                                </td>
+
+                                <td class="py-2.5 px-2">
+                                    <div class="flex items-center gap-1.5 justify-center">
+                                        <input type="hidden" name="sin_iva" :value="it.sin_iva ? '1' : '0'">
+                                        <input type="number"
+                                               step="0.01"
+                                               min="0"
+                                               name="iva_pct"
+                                               x-model.number="it.iva_pct"
+                                               :readonly="it.sin_iva"
+                                               class="w-14 px-2 py-1.5 border border-slate-300 rounded-lg text-xs text-right font-bold"
+                                               :class="it.sin_iva ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-800'">
+                                        <label class="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 cursor-pointer whitespace-nowrap">
+                                            <input type="checkbox"
+                                                   x-model="it.sin_iva"
+                                                   @change="if(it.sin_iva){ it.iva_pct = 0; } else { it.iva_pct = (moneda === 'COP' ? 19 : 7); }"
+                                                   class="rounded border-slate-300 text-[#002060] focus:ring-[#002060]">
+                                            <span :class="it.sin_iva ? 'text-emerald-700 font-extrabold' : 'text-slate-600'">Exento</span>
+                                        </label>
+                                    </div>
+                                </td>
+
+                                <td class="py-2.5 px-3 text-right font-extrabold text-slate-900 font-mono-code whitespace-nowrap bg-slate-50/40">
+                                    $<span x-text="totalItem(it).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                </td>
+
+                                <td class="py-2.5 px-3">
+                                    <input type="text"
+                                           name="remarks"
+                                           x-model="it.remarks"
+                                           placeholder="Ej. Nuevo / Cert. FAA 8130"
+                                           class="w-full px-2.5 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-[#002060]">
+                                </td>
+
+                                <td class="py-2.5 px-2 text-center">
+                                    <button type="button"
+                                            @click="eliminarItem(idx)"
+                                            x-show="items.length > 1"
+                                            class="p-1 rounded-lg hover:bg-rose-50 text-rose-600 font-extrabold text-base transition"
+                                            title="Quitar esta línea">
+                                        &times;
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- RESUMEN FINANCIERO EN TIEMPO REAL Y OPCIONES DE GUARDADO -->
+            <div class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+                <div class="lg:col-span-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+                    <label class="block text-[11px] font-extrabold text-[#002060] uppercase mb-1">
+                        Valor de Transporte / Flete Adicional (<span x-text="moneda"></span>)
+                    </label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           name="transport"
+                           x-model.number="transport"
+                           placeholder="0.00"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-bold bg-white focus:ring-2 focus:ring-[#002060]">
+                    <p class="text-[11px] text-slate-500 mt-1.5">
+                        Si el flete o transporte no aplica o ya está incluido en los precios, mantén el valor en 0.00.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-8 bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-right">
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Subtotal Base</span>
+                            <span class="text-xs sm:text-sm font-extrabold text-slate-800 font-mono-code">
+                                $<span x-text="subtotalBase().toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                            </span>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <span class="text-[10px] font-bold uppercase text-amber-700 block">Cargos Hazmat</span>
+                            <span class="text-xs sm:text-sm font-extrabold text-amber-800 font-mono-code">
+                                $<span x-text="totalHazmat().toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                            </span>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <span class="text-[10px] font-bold uppercase text-blue-700 block">Certificados</span>
+                            <span class="text-xs sm:text-sm font-extrabold text-blue-800 font-mono-code">
+                                $<span x-text="totalCertificados().toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                            </span>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <span class="text-[10px] font-bold uppercase text-slate-500 block">IVA / Impuestos</span>
+                            <span class="text-xs sm:text-sm font-extrabold text-slate-800 font-mono-code">
+                                $<span x-text="totalImpuestos().toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                            </span>
+                        </div>
+                        <div class="col-span-2 sm:col-span-1 bg-[#002060] text-white p-2.5 rounded-xl shadow-xs">
+                            <span class="text-[10px] font-extrabold uppercase text-sky-200 block">Gran Total</span>
+                            <span class="text-sm sm:text-base font-extrabold font-mono-code block mt-0.5">
+                                $<span x-text="granTotal().toLocaleString('en-US', {minimumFractionDigits: 2})"></span>
+                            </span>
+                            <span class="text-[10px] font-bold text-sky-300" x-text="moneda"></span>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-200 flex flex-wrap justify-end gap-2.5">
+                        <button type="submit"
+                                name="accion_posterior"
+                                value="guardar_ir_panel"
+                                class="bg-slate-800 hover:bg-slate-950 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs shadow-sm transition">
+                            Guardar y Volver al Panel
+                        </button>
+                        <button type="submit"
+                                name="accion_posterior"
+                                value="convertir_po"
+                                class="bg-[#1B4F9C] hover:bg-[#002060] text-white font-extrabold py-2.5 px-4 rounded-xl text-xs shadow-sm transition">
+                            Guardar y Convertir en Orden (PO)
+                        </button>
+                        <button type="submit"
+                                name="accion_posterior"
+                                value="descargar_excel"
+                                class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-5 rounded-xl text-xs shadow-md transition">
+                            Guardar y Descargar Excel V4 (.xlsx)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Copyright © 2026 Fly Logistic. -->
+<script>
+function cotizadorApp() {
+    return {
+        moneda: 'COP',
+        tipoOperacion: 'Nacional',
+        transport: 0,
+        items: [
+            {
+                description: '',
+                qty: 1,
+                unit: 'UND',
+                unit_price: 0,
+                hazmat: 0,
+                certificado: 0,
+                sin_iva: false,
+                iva_pct: 19,
+                remarks: ''
+            }
+        ],
+        actualizarIvaPorMoneda() {
+            const pctDefault = this.moneda === 'COP' ? 19 : 7;
+            this.tipoOperacion = this.moneda === 'COP' ? 'Nacional' : 'Internacional';
+            this.items.forEach((it) => {
+                if (!it.sin_iva) {
+                    it.iva_pct = pctDefault;
+                }
+            });
+        },
+        agregarItem() {
+            if (this.items.length >= 14) {
+                alert('La plantilla oficial Formato V4 permite hasta un máximo de 14 ítems por cotización.');
+                return;
+            }
+            this.items.push({
+                description: '',
+                qty: 1,
+                unit: 'UND',
+                unit_price: 0,
+                hazmat: 0,
+                certificado: 0,
+                sin_iva: false,
+                iva_pct: this.moneda === 'COP' ? 19 : 7,
+                remarks: ''
+            });
+        },
+        eliminarItem(idx) {
+            if (this.items.length > 1) {
+                this.items.splice(idx, 1);
+            }
+        },
+        subtotalItem(it) {
+            const base = (Number(it.qty) || 0) * (Number(it.unit_price) || 0);
+            return base + (Number(it.hazmat) || 0) + (Number(it.certificado) || 0);
+        },
+        impuestoItem(it) {
+            if (it.sin_iva) return 0;
+            return this.subtotalItem(it) * ((Number(it.iva_pct) || 0) / 100);
+        },
+        totalItem(it) {
+            return this.subtotalItem(it) + this.impuestoItem(it);
+        },
+        subtotalBase() {
+            return this.items.reduce((acc, it) => acc + ((Number(it.qty) || 0) * (Number(it.unit_price) || 0)), 0);
+        },
+        totalHazmat() {
+            return this.items.reduce((acc, it) => acc + (Number(it.hazmat) || 0), 0);
+        },
+        totalCertificados() {
+            return this.items.reduce((acc, it) => acc + (Number(it.certificado) || 0), 0);
+        },
+        totalImpuestos() {
+            return this.items.reduce((acc, it) => acc + this.impuestoItem(it), 0);
+        },
+        granTotal() {
+            const sumaLineas = this.items.reduce((acc, it) => acc + this.totalItem(it), 0);
+            return sumaLineas + (Number(this.transport) || 0);
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -1,572 +1,1254 @@
 {% extends "base.html" %}
+{% block title %}Centro de Operaciones — Fly Logistic{% endblock %}
+
 {% block content %}
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-4"
-     x-data="{ menuExcel: false, menuCorreos: false, modalCorreoIndividual: false, asesorFiltro: '{{ asesor_f }}' }">
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-4 border-b border-slate-200">
-        <div>
-            <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-lg sm:text-xl font-extrabold fly-text">Control de Órdenes de Compra (PO)</h2>
-                {% if asesor_f == (user.id ~ '') %}
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-[#002060] uppercase">
-                    Vista Activa: Mi Cartera Propia
-                </span>
-                {% elif asesor_f == 'todos' %}
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 uppercase">
-                    Vista Activa: Todos los Asesores
-                </span>
-                {% endif %}
-            </div>
-            <p class="text-xs text-slate-500">Listado operativo ordenado por prioridad de entrega (15 registros por página)</p>
-        </div>
+<div x-data="centroComando()" class="space-y-5">
 
-        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-            <!-- ======================================================================= -->
-            <!-- CENTRO DE REPORTES EXCEL UNIFICADO (ASOCIADO AL FILTRO ACTIVO)         -->
-            <!-- ======================================================================= -->
-            <div class="relative col-span-2 sm:col-auto">
-                <button type="button"
-                        @click="menuExcel = !menuExcel; menuCorreos = false"
-                        @click.outside="menuExcel = false"
-                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-extrabold text-xs shadow-sm transition inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/></svg>
-                    <span>Centro de Reportes Excel ▾</span>
-                </button>
-
-                <div x-show="menuExcel" x-cloak x-transition
-                     class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
-                    <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">REPORTE ASOCIADO A VISTA ACTIVA</span>
-                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#002060]">Rol: {{ user.rol }}</span>
-                    </div>
-
-                    <!-- 1. Consolidado de Cartera Operativa -->
-                    <a :href="`/pedidos/consolidado/excel?asesor_id=${asesorFiltro}`"
-                       class="block px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 transition">
-                        <div class="font-extrabold text-emerald-700 text-xs flex items-center justify-between">
-                            <span>📊 Consolidado de Cartera Operativa</span>
-                            <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLSX</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            Pestañas Nacional (COP) e Internacional (USD) según el colaborador o vista seleccionada.
-                        </p>
-                    </a>
-
-                    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                    <!-- 2. Control Maestro Global de Productos e Ítems -->
-                    <a :href="`/informes/productos_excel?asesor_id=${asesorFiltro}`"
-                       class="block px-4 py-2.5 hover:bg-indigo-50 border-b border-slate-100 transition">
-                        <div class="font-extrabold text-indigo-700 text-xs flex items-center justify-between">
-                            <span>📦 Control Maestro de Productos</span>
-                            <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">XLSX</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            Trazabilidad por SKU, proveedor y semáforo de compra según la vista activa.
-                        </p>
-                    </a>
-
-                    <!-- 3. Informe Gerencial de Desempeño e Indicadores -->
-                    <a :href="`/informes/excel?asesor_id=${asesorFiltro}`"
-                       class="block px-4 py-2.5 hover:bg-blue-50 transition">
-                        <div class="font-extrabold text-[#002060] text-xs flex items-center justify-between">
-                            <span>📈 Informe Gerencial e Indicadores</span>
-                            <span class="text-[10px] bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded">XLSX</span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            Métricas de asesores (SLA %), semáforo de POs y resumen de faltantes.
-                        </p>
-                    </a>
-                    {% endif %}
+    <!-- ========================================================================= -->
+    <!-- 1. PANEL SUPERIOR DEL CENTRO DE OPERACIONES                               -->
+    <!-- ========================================================================= -->
+    <div class="fly-card p-4 sm:p-6">
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-5 border-b border-slate-200/80">
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060] tracking-tight">
+                        Tu centro de operaciones
+                    </h1>
+                    <span class="bg-blue-50 text-[#002060] border border-blue-200 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
+                        {% if asesor_f_activo == 'todos' %}
+                            Vista Global del Equipo
+                        {% else %}
+                            Cartera de {{ nombre_asesor_seleccionado }}
+                        {% endif %}
+                    </span>
                 </div>
+                <p class="text-xs text-slate-500 mt-1">
+                    Consulta, filtra y gestiona tus órdenes de compra confirmadas y las cotizaciones enviadas a tus clientes desde un solo panel adaptable.
+                </p>
             </div>
 
-            <!-- ======================================================================= -->
-            <!-- SELECTOR DE CORREOS                                                     -->
-            <!-- ======================================================================= -->
-            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-            <div class="relative col-span-2 sm:col-auto">
-                <button type="button"
-                        @click="menuCorreos = !menuCorreos; menuExcel = false"
-                        @click.outside="menuCorreos = false"
-                        class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-lg font-extrabold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    <span>Selector de Correos ▾</span>
-                </button>
-
-                <div x-show="menuCorreos" x-cloak x-transition
-                     class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-left">
-                    <div class="px-4 py-1.5 border-b border-slate-100 bg-slate-50">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Centro de Notificaciones SMTP</span>
-                    </div>
-
+            <!-- Botones de Acción Principal y Menú de Reportes Excel en 2 Columnas (Sin recortes) -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- MENÚ DESPLEGABLE DE REPORTES EXCEL: AMPLIO Y EN 2 COLUMNAS PARA VER TODAS LAS OPCIONES A LA VEZ -->
+                <div class="relative" x-data="{ menuExcel: false }">
                     <button type="button"
-                            @click="modalCorreoIndividual = true; menuCorreos = false"
-                            class="w-full text-left px-4 py-2.5 hover:bg-amber-50 border-b border-slate-100 transition">
-                        <span class="font-extrabold text-slate-800 block text-xs">✉️ Notificación Individual por PO</span>
-                        <span class="text-[11px] text-slate-500">Seleccionar una Orden de Compra específica para enviar alerta</span>
+                            @click="menuExcel = !menuExcel"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-sm transition inline-flex items-center gap-2">
+                        <span>Exportar Reportes Excel</span>
+                        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold" x-text="menuExcel ? 'Cerrar' : '8 Reportes'">8 Reportes</span>
                     </button>
 
-                    <form action="/pedidos/notificar_proximos" method="post" class="m-0 border-b border-slate-100">
-                        <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition">
-                            <span class="font-extrabold text-[#002060] block text-xs">📬 Seguimiento Masivo de POs Activas</span>
-                            <span class="text-[11px] text-slate-500">Notificar estado de plazo a los asesores responsables</span>
-                        </button>
-                    </form>
-
-                    {% if user.rol in ['Administrador', 'Gerencia'] %}
-                    <form action="/pedidos/notificar_faltantes" method="post" class="m-0">
-                        <button type="submit" class="w-full text-left px-4 py-2.5 hover:bg-red-50 transition">
-                            <span class="font-extrabold text-red-700 block text-xs">🚨 Reporte Consolidado de Faltantes</span>
-                            <span class="text-[11px] text-slate-500">Exclusivo Gerencia/Admin: Resumen global de compras pendientes</span>
-                        </button>
-                    </form>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
-            <a href="/pedidos/nuevo" class="col-span-2 sm:col-auto fly-bg fly-hover text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                <span>+ Nueva Orden</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Modal para seleccionar PO en "Notificación Individual por PO" -->
-    {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-    <div x-show="modalCorreoIndividual" x-cloak
-         class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-        <div @click.outside="modalCorreoIndividual = false"
-             class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5">
-            <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
-                <h3 class="text-sm font-extrabold text-[#002060] uppercase">Notificación Individual por PO</h3>
-                <button type="button" @click="modalCorreoIndividual = false" class="text-slate-400 hover:text-slate-700 font-bold text-sm">✕</button>
-            </div>
-            <form action="/pedidos/selector_correos" method="post" class="space-y-4">
-                <input type="hidden" name="tipo_correo" value="individual_po">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Seleccione la Orden de Compra a notificar:</label>
-                    <select name="pedido_id" required class="w-full h-10 border border-slate-300 rounded-lg px-3 text-xs font-semibold bg-white">
-                        {% for p_sel in todos_pedidos %}
-                        <option value="{{ p_sel.id }}">{{ p_sel.po_codigo }} — {{ p_sel.cliente.nombre }} ({{ p_sel.asesor.nombre }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" @click="modalCorreoIndividual = false" class="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-xs font-bold">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 rounded-lg fly-bg text-white text-xs font-extrabold">Enviar Notificación</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if todos_pedidos %}
-    {% set ns = namespace(en_contra=0, a_favor=0, entregadas=0) %}
-    {% for p in todos_pedidos %}
-        {% if p.estado == 'Entregado' %}
-            {% set ns.entregadas = ns.entregadas + 1 %}
-        {% elif p.dias_habiles_info.en_contra %}
-            {% set ns.en_contra = ns.en_contra + 1 %}
-        {% else %}
-            {% set ns.a_favor = ns.a_favor + 1 %}
-        {% endif %}
-    {% endfor %}
-
-    <div class="py-3 border-b border-slate-200">
-        <div class="flex flex-wrap items-center justify-between gap-2.5">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Resumen de Cartera:</span>
-                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                    Total: {{ total_pedidos }}
-                </span>
-                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-200">
-                    Vencidas: {{ ns.en_contra }}
-                </span>
-                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    En Plazo: {{ ns.a_favor }}
-                </span>
-                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                    Entregadas: {{ ns.entregadas }}
-                </span>
-            </div>
-
-            <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] font-bold uppercase text-slate-400">Prioridad Inmediata:</span>
-                {% for p in todos_pedidos[:4] %}
-                    {% set info = p.dias_habiles_info %}
-                    <a href="/pedidos/{{ p.id }}/editar" class="px-2.5 py-1 rounded-md text-[10px] font-bold transition inline-flex items-center whitespace-nowrap
-                        {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
-                        {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
-                        {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
-                        {{ info.etiqueta }}
-                    </a>
-                {% endfor %}
-                {% if (todos_pedidos | length) > 4 %}
-                <button type="button" onclick="document.getElementById('modal-todas-prioridades').classList.toggle('hidden')" class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-800 hover:bg-slate-900 text-white transition whitespace-nowrap">
-                    Ver todas ({{ todos_pedidos | length }})
-                </button>
-                {% endif %}
-            </div>
-        </div>
-
-        {% if (todos_pedidos | length) > 4 %}
-        <div id="modal-todas-prioridades" class="hidden mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 rounded-lg border border-slate-200">
-            {% for p in todos_pedidos %}
-                {% set info = p.dias_habiles_info %}
-                <a href="/pedidos/{{ p.id }}/editar" class="px-2.5 py-1 rounded-md text-[10px] font-bold transition inline-flex items-center whitespace-nowrap
-                    {% if info.color == 'emerald' %}bg-emerald-600 hover:bg-emerald-700 text-white
-                    {% elif info.color == 'red' %}bg-red-600 hover:bg-red-700 text-white
-                    {% else %}bg-slate-200 hover:bg-slate-300 text-slate-700{% endif %}">
-                    {{ info.etiqueta }}
-                </a>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <form method="get" action="/pedidos" class="pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
-        <div class="lg:col-span-2">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Número de PO</label>
-            <input type="text" name="po" value="{{ po_f }}" placeholder="Ej. PO-2026-01" class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
-        </div>
-        <div class="lg:col-span-2">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Cliente</label>
-            <input type="text" name="cliente" value="{{ cliente_f }}" placeholder="Nombre del cliente..." class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
-        </div>
-        <div class="lg:col-span-2">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Proveedor</label>
-            <input type="text" name="proveedor" value="{{ proveedor_f }}" placeholder="Nombre del proveedor..." class="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs">
-        </div>
-        {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-        <div class="lg:col-span-2">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Vista Cartera / Asesor</label>
-            <select name="asesor_id" x-model="asesorFiltro" class="w-full h-9 px-2.5 border border-blue-400 rounded-lg text-xs bg-blue-50/40 font-bold text-[#002060]">
-                <option value="{{ user.id }}">Mi Cartera Propia ({{ user.nombre }})</option>
-                <option value="todos">Todos los Asesores (Global)</option>
-                {% for a in asesores_disponibles %}
-                    {% if a.id != user.id %}
-                    <option value="{{ a.id }}">{{ a.nombre }} ({{ a.rol }})</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-        <div class="{% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Operación</label>
-            <select name="tipo" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
-                <option value="">Todas</option>
-                <option value="Nacional" {% if tipo_f == 'Nacional' %}selected{% endif %}>Nacional</option>
-                <option value="Internacional" {% if tipo_f == 'Internacional' %}selected{% endif %}>Internacional</option>
-            </select>
-        </div>
-        <div class="{% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Estado PO</label>
-            <select name="estado" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
-                <option value="">Todos</option>
-                {% for e in estados %}
-                <option value="{{ e }}" {% if estado_f == e %}selected{% endif %}>{{ e }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="lg:col-span-1">
-            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Estado Ítem</label>
-            <select name="estado_producto" class="w-full h-9 px-2 border border-slate-300 rounded-lg text-xs bg-white">
-                <option value="">Todos</option>
-                {% for ep in estados_producto %}
-                <option value="{{ ep }}" {% if estado_prod_f == ep %}selected{% endif %}>{{ ep }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="lg:col-span-1 flex gap-1.5">
-            <button type="submit" class="fly-bg fly-hover text-white h-9 px-3 rounded-lg text-xs font-bold flex-grow">Filtrar</button>
-            <a href="/pedidos" class="bg-slate-200 hover:bg-slate-300 text-slate-700 h-9 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center" title="Volver a Mi Cartera Propia">Limpiar</a>
-        </div>
-    </form>
-</div>
-
-<!-- VISTA MÓVIL Y TABLET -->
-<div class="lg:hidden space-y-3 mb-4">
-    {% for p in pedidos %}
-    {% set info = p.dias_habiles_info %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <div class="flex justify-between items-start gap-2 pb-2.5 border-b border-slate-100">
-            <div>
-                <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="font-extrabold text-[#002060] text-sm">{{ p.po_codigo }}</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold
-                        {% if info.color == 'emerald' %}bg-emerald-600 text-white
-                        {% elif info.color == 'red' %}bg-red-600 text-white
-                        {% else %}bg-slate-200 text-slate-700{% endif %}">
-                        {{ info.etiqueta }}
-                    </span>
-                </div>
-                <div class="text-xs font-bold text-slate-800 mt-1">{{ p.cliente.nombre }}</div>
-            </div>
-            <div class="text-right shrink-0">
-                <div class="font-extrabold text-slate-900 text-sm">{{ p.total | money }} <span class="text-[10px] text-slate-500">{{ p.moneda }}</span></div>
-                <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
-                    {{ p.tipo }} ({{ p.moneda }}) | {{ p.estado }}
-                </span>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-600 py-2 border-b border-slate-100">
-            <div>Inicio: <strong class="text-slate-800">{{ p.fecha_inicial }}</strong></div>
-            <div>Prometido: <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
-            <div>Actualizado: <strong class="text-slate-800">{{ p.actualizado_en.strftime('%Y-%m-%d %H:%M') if p.actualizado_en else p.fecha_inicial }}</strong></div>
-            <div>Asesor: <strong class="text-slate-800">{{ p.asesor.nombre }}</strong></div>
-        </div>
-
-        <div class="py-2 space-y-1.5">
-            {% for it in p.items[:3] %}
-            <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2">
-                <div class="truncate">
-                    <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
-                    <span class="text-slate-600">| {{ it.descripcion }}</span>
-                </div>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
-                    {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
-                </span>
-            </div>
-            {% endfor %}
-            {% if (p.items | length) > 3 %}
-            <div id="items-extra-movil-{{ p.id }}" class="hidden space-y-1.5 pt-1">
-                {% for it in p.items[3:] %}
-                <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2">
-                    <div class="truncate">
-                        <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
-                        <span class="text-slate-600">| {{ it.descripcion }}</span>
-                    </div>
-                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
-                        {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
-                    </span>
-                </div>
-                {% endfor %}
-            </div>
-            <button type="button" onclick="toggleItemsMovil({{ p.id }}, {{ (p.items | length) - 3 }})" id="btn-items-movil-{{ p.id }}" class="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 py-1 rounded-lg w-full text-center">
-                Ver {{ (p.items | length) - 3 }} ítem(s) adicionales ({{ p.items | length }} en total)
-            </button>
-            {% endif %}
-        </div>
-
-        <div class="pt-2.5 flex flex-wrap gap-1.5 justify-end">
-            <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Editar</a>
-            <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs" title="Descargar Formato Operativo Individual FM-08">FM-08 Excel</a>
-            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-            <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
-                <button type="submit" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs">Notificar</button>
-            </form>
-            <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Confirmar eliminación de {{ p.po_codigo }}?');" class="inline m-0">
-                <button type="submit" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">Eliminar</button>
-            </form>
-            {% endif %}
-        </div>
-    </div>
-    {% else %}
-    <div class="bg-white rounded-xl p-8 text-center text-slate-400 text-sm border border-slate-200">
-        No se encontraron órdenes registradas con los criterios seleccionados.
-    </div>
-    {% endfor %}
-</div>
-
-<!-- VISTA ESCRITORIO -->
-<div class="hidden lg:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-4">
-    <table class="w-full table-fixed divide-y divide-slate-200 text-xs">
-        <thead class="fly-bg text-white text-[11px] uppercase tracking-wider">
-            <tr class="divide-x divide-blue-900/40">
-                <th class="w-[16%] px-4 py-3 text-left">PO / Indicador</th>
-                <th class="w-[12%] px-4 py-3 text-left">Cliente</th>
-                <th class="w-[26%] px-4 py-3 text-left">Part Number, Proveedor y Estado</th>
-                <th class="w-[9%] px-4 py-3 text-center">Operación</th>
-                <th class="w-[11%] px-4 py-3 text-left">Asesor</th>
-                <th class="w-[9%] px-4 py-3 text-left">Fechas</th>
-                <th class="w-[8%] px-4 py-3 text-right">Total</th>
-                <th class="w-[9%] px-4 py-3 text-center">Acciones</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-            {% for p in pedidos %}
-            {% set info = p.dias_habiles_info %}
-            <tr class="hover:bg-slate-50/80 align-top divide-x divide-slate-100">
-                <td class="px-4 py-3 text-left break-words">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        <span class="font-extrabold text-[#002060] text-sm">{{ p.po_codigo }}</span>
-                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold
-                            {% if info.color == 'emerald' %}bg-emerald-600 text-white
-                            {% elif info.color == 'red' %}bg-red-600 text-white
-                            {% else %}bg-slate-200 text-slate-700{% endif %}">
-                            {{ info.etiqueta }}
-                        </span>
-                    </div>
-                    <div class="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                        <div>Inicio: <strong>{{ p.fecha_inicial }}</strong></div>
-                        <div>Actualizado: <strong>{{ p.actualizado_en.strftime('%Y-%m-%d %H:%M') if p.actualizado_en else p.fecha_inicial }}</strong></div>
-                        <div>Estado: <strong class="text-slate-700">{{ p.estado }}</strong></div>
-                    </div>
-                </td>
-
-                <td class="px-4 py-3 text-left font-bold text-slate-800 break-words">
-                    {{ p.cliente.nombre }}
-                </td>
-
-                <td class="px-4 py-2.5 text-left">
-                    <div class="space-y-1.5">
-                        {% for it in p.items[:3] %}
-                        <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
-                            <div class="truncate">
-                                <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
-                                <span class="text-slate-600">| {{ it.descripcion }}</span>
-                                <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
-                                {% if it.es_exento_iva %}
-                                <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
-                                {% endif %}
-                            </div>
-                            <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
-                                {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
-                            </span>
-                        </div>
-                        {% endfor %}
-
-                        {% if (p.items | length) > 3 %}
-                        <div id="items-extra-{{ p.id }}" class="hidden space-y-1.5 pt-1">
-                            {% for it in p.items[3:] %}
-                            <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
-                                <div class="truncate">
-                                    <span class="font-bold text-[#002060]">{{ it.parte_numero }}</span>
-                                    <span class="text-slate-600">| {{ it.descripcion }}</span>
-                                    <span class="text-slate-400 font-medium">({{ it.proveedor }})</span>
-                                    {% if it.es_exento_iva %}
-                                    <span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">SIN IVA 0%</span>
-                                    {% endif %}
-                                </div>
-                                <span class="px-2 py-0.5 rounded text-[9px] font-bold shrink-0 bg-slate-100 text-slate-800">
-                                    {{ it.estado_producto or 'PENDIENTE DE PAGO' }}
+                    <div x-show="menuExcel" x-cloak x-transition
+                         @click.outside="menuExcel = false"
+                         class="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 mt-2 w-auto sm:w-[680px] lg:w-[760px] max-w-[96vw] bg-white rounded-2xl shadow-2xl border-2 border-[#002060]/15 z-50 overflow-hidden">
+                        <div class="px-4 py-3 bg-[#002060] text-white flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-sky-200 block">
+                                    Todos tus reportes oficiales en un solo lugar
+                                </span>
+                                <span class="text-xs font-bold">
+                                    Haz clic sobre cualquier opción para descargar el archivo Excel (.xlsx) inmediatamente
                                 </span>
                             </div>
-                            {% endfor %}
+                            <span class="text-[10px] font-extrabold bg-white/15 text-white px-2.5 py-1 rounded-lg">
+                                {{ user.rol }}
+                            </span>
                         </div>
-                        <button type="button" onclick="toggleItemsPO({{ p.id }}, {{ (p.items | length) - 3 }})" id="btn-items-{{ p.id }}" class="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1 rounded-lg transition w-full text-center">
-                            Ver {{ (p.items | length) - 3 }} ítem(s) adicionales ({{ p.items | length }} en total)
-                        </button>
-                        {% endif %}
+
+                        <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/70">
+                            <!-- Columna 1: Órdenes de Compra e Indicadores -->
+                            <div class="space-y-2">
+                                <div class="px-1 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#002060] border-b border-slate-200">
+                                    1. Órdenes de Compra (PO) e Indicadores
+                                </div>
+                                <a href="/pedidos/consolidado/excel{% if asesor_f_activo and asesor_f_activo != 'todos' %}?asesor_id={{ asesor_f_activo }}{% elif asesor_f_activo == 'todos' %}?asesor_id=todos{% endif %}"
+                                   class="block p-3 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Consolidado de Órdenes (PO)</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-blue-100 text-[#002060]">COP / USD</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Genera la cartera activa separando compras Nacionales (COP) e Internacionales (USD).
+                                    </p>
+                                </a>
+
+                                <a href="/informes/exportar/productos_po{% if asesor_f_activo and asesor_f_activo != 'todos' %}?asesor={{ asesor_f_activo }}{% endif %}"
+                                   class="block p-3 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Control Maestro de Productos por PO</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">Ítems</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Detalla línea por línea cada Part Number, proveedor, compra, IVA y estado operativo.
+                                    </p>
+                                </a>
+
+                                <a href="/informes/exportar{% if asesor_f_activo and asesor_f_activo != 'todos' %}?asesor={{ asesor_f_activo }}{% endif %}"
+                                   class="block p-3 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Informe Ejecutivo de Gestión y SLA</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-900">Gerencial</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Consolida métricas por responsable, cumplimiento de plazos prometidos y volumen facturado.
+                                    </p>
+                                </a>
+
+                                <a href="/cotizaciones/exportar/excel"
+                                   class="block p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Cartera de Cotizaciones a Clientes</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Cotizaciones</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Descarga todas las cotizaciones emitidas con cliente, vencimiento y valor cotizado.
+                                    </p>
+                                </a>
+                            </div>
+
+                            <!-- Columna 2: Inventario Corporativo Aeronáutico (3 Bodegas + Maestro) -->
+                            <div class="space-y-2">
+                                <div class="px-1 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 border-b border-emerald-200">
+                                    2. Inventario Corporativo Aeronáutico
+                                </div>
+                                <a href="/inventario/exportar/maestro"
+                                   class="block p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Inventario Maestro Consolidado</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Total 3 Bodegas</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Une las existencias de las 3 bodegas en un solo libro Excel con hojas separadas.
+                                    </p>
+                                </a>
+
+                                <a href="/inventario/exportar/warehouse/1"
+                                   class="block p-2.5 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Inventario Bodega 1 (Warehouse 1)</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-sky-100 text-sky-800">WH 1</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Exporta existencias, códigos de barras, lotes y fechas DOM/DOE de Bodega 1.
+                                    </p>
+                                </a>
+
+                                <a href="/inventario/exportar/warehouse/2"
+                                   class="block p-2.5 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Inventario Bodega 2 (Warehouse 2)</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-sky-100 text-sky-800">WH 2</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Exporta existencias, códigos de barras, lotes y fechas DOM/DOE de Bodega 2.
+                                    </p>
+                                </a>
+
+                                <a href="/inventario/exportar/warehouse/3"
+                                   class="block p-2.5 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-extrabold text-slate-900">Inventario Bodega 3 (Warehouse 3)</span>
+                                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded bg-sky-100 text-sky-800">WH 3</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">
+                                        Exporta existencias, códigos de barras, lotes y fechas DOM/DOE de Bodega 3.
+                                    </p>
+                                </a>
+                            </div>
+                        </div>
                     </div>
-                </td>
+                </div>
 
-                <td class="px-4 py-3 text-center break-words">
-                    <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full {% if p.tipo == 'Nacional' %}bg-emerald-100 text-emerald-800{% else %}bg-sky-100 text-sky-800{% endif %}">
-                        {{ p.tipo }} ({{ p.moneda }})
-                    </span>
-                    <div class="text-[11px] text-slate-500 mt-1 font-medium">{{ p.metodo_pago or 'Por definir' }}</div>
-                </td>
+                {% if total_vencidas > 0 or total_proximas > 0 %}
+                <form method="post" action="/pedidos/notificar_alertas" class="inline">
+                    <button type="submit"
+                            class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-sm transition">
+                        Enviar Recordatorio por Correo
+                    </button>
+                </form>
+                {% endif %}
 
-                <td class="px-4 py-3 text-left break-words">
-                    <div class="font-bold text-slate-800 leading-tight">{{ p.asesor.nombre }}</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">{{ p.asesor.rol }}</div>
-                </td>
+                <a href="/cotizador/nuevo"
+                   class="bg-[#1B4F9C] hover:bg-[#002060] text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-sm transition">
+                    + Nueva Cotización
+                </a>
+                <a href="/pedidos/nuevo"
+                   class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-sm transition">
+                    + Nueva Orden (PO)
+                </a>
+            </div>
+        </div>
 
-                <td class="px-4 py-3 text-left text-[11px] break-words">
-                    <div><span class="text-slate-400 font-semibold">Prometido:</span> <strong class="text-slate-800">{{ p.plazo_entrega or 'Sin definir' }}</strong></div>
-                    {% if p.fecha_entrega_cliente %}
-                    <div class="text-emerald-700 font-bold mt-0.5">Entregado: {{ p.fecha_entrega_cliente }}</div>
-                    {% endif %}
-                </td>
-
-                <td class="px-4 py-3 text-right font-extrabold text-slate-900 text-xs break-words">
-                    {{ p.total | money }} <span class="text-[10px] text-slate-500">{{ p.moneda }}</span>
-                    {% if p.tipo == 'Internacional' and p.valor_nacionalizacion_dec > 0 %}
-                    <span class="block text-[10px] font-semibold text-amber-700">Nac: {{ p.valor_nacionalizacion_dec | money }}</span>
-                    {% endif %}
-                </td>
-
-                <td class="px-3 py-3 text-center">
-                    <div class="flex flex-wrap justify-center gap-1">
-                        <a href="/pedidos/{{ p.id }}/editar" class="bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-1 rounded font-bold text-[11px]">Editar</a>
-                        <a href="/pedidos/{{ p.id }}/excel" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded font-bold text-[11px]" title="Descargar Formato Operativo Individual FM-08">Excel</a>
-                        {% if p.lista_documentos %}
-                        <a href="/pedidos/{{ p.id }}/documento" class="bg-purple-50 text-purple-700 hover:bg-purple-100 px-2 py-1 rounded font-bold text-[11px]" title="{{ p.lista_documentos | length }} documento(s) adjunto(s)">
-                            Docs ({{ p.lista_documentos | length }})
-                        </a>
-                        {% elif p.documentacion_archivo %}
-                        <a href="/pedidos/{{ p.id }}/documento" class="bg-purple-50 text-purple-700 hover:bg-purple-100 px-2 py-1 rounded font-bold text-[11px]">PDF</a>
-                        {% endif %}
-                        {% if p.drive_folder_link or p.drive_link %}
-                        <a href="{{ p.drive_folder_link or p.drive_link }}" target="_blank" class="bg-sky-50 text-sky-700 hover:bg-sky-100 px-2 py-1 rounded font-bold text-[11px]">Drive</a>
-                        {% endif %}
-                        {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                        <form action="/pedidos/{{ p.id }}/notificar" method="post" class="inline m-0">
-                            <button type="submit" class="bg-amber-100 text-amber-800 hover:bg-amber-200 px-2 py-1 rounded font-bold text-[11px]" title="Notificar por correo">Correo</button>
-                        </form>
-                        <form action="/pedidos/{{ p.id }}/eliminar" method="post" onsubmit="return confirm('¿Confirmar eliminación de {{ p.po_codigo }}?');" class="inline m-0">
-                            <button type="submit" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded font-bold text-[11px]" title="Eliminar orden">Borrar</button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="8" class="px-6 py-10 text-center text-slate-400 text-sm">No se encontraron órdenes registradas con los criterios seleccionados.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-{% if total_paginas > 1 %}
-<div class="flex flex-wrap items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-200 gap-3">
-    <div class="text-xs text-slate-500 font-semibold">
-        Página <strong class="text-slate-800">{{ pagina_actual }}</strong> de <strong class="text-slate-800">{{ total_paginas }}</strong> ({{ total_pedidos }} órdenes en total)
-    </div>
-    <div class="flex items-center gap-1.5 flex-wrap">
-        {% if pagina_actual > 1 %}
-        <a href="/pedidos?page={{ pagina_actual - 1 }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
-            Anterior
-        </a>
-        {% endif %}
-
-        {% for p_num in range(1, total_paginas + 1) %}
-            {% if p_num == 1 or p_num == total_paginas or (p_num >= pagina_actual - 2 and p_num <= pagina_actual + 2) %}
-            <a href="/pedidos?page={{ p_num }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 rounded-lg text-xs font-bold transition {% if p_num == pagina_actual %}fly-bg text-white shadow{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700{% endif %}">
-                {{ p_num }}
+        <!-- RESUMEN FINANCIERO EN 4 TARJETAS CLARAS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 py-4 border-b border-slate-200/80">
+            <a href="/pedidos?tipo=Nacional&asesor_id={{ asesor_f_activo }}"
+               class="p-3.5 rounded-2xl border transition flex items-center justify-between {% if f_tipo == 'Nacional' %}bg-blue-50/90 border-[#002060]{% else %}bg-slate-50/70 border-slate-200/90 hover:border-slate-300{% endif %}">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Órdenes Nacionales (COP)</span>
+                    <p class="text-base sm:text-lg font-extrabold text-[#002060] mt-0.5">
+                        ${{ "{:,.2f}".format(volumen_cop) }} <span class="text-[10px] font-bold text-slate-500">COP</span>
+                    </p>
+                </div>
+                <span class="text-[10px] font-extrabold bg-[#002060] text-white px-2.5 py-1 rounded-lg">POs COP</span>
             </a>
-            {% elif p_num == pagina_actual - 3 or p_num == pagina_actual + 3 %}
-            <span class="px-2 text-slate-400">...</span>
+
+            <a href="/pedidos?tipo=Internacional&asesor_id={{ asesor_f_activo }}"
+               class="p-3.5 rounded-2xl border transition flex items-center justify-between {% if f_tipo == 'Internacional' %}bg-sky-50/90 border-sky-600{% else %}bg-slate-50/70 border-slate-200/90 hover:border-slate-300{% endif %}">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Órdenes Internacionales (USD)</span>
+                    <p class="text-base sm:text-lg font-extrabold text-sky-900 mt-0.5">
+                        ${{ "{:,.2f}".format(volumen_usd) }} <span class="text-[10px] font-bold text-slate-500">USD</span>
+                    </p>
+                </div>
+                <span class="text-[10px] font-extrabold bg-sky-700 text-white px-2.5 py-1 rounded-lg">POs USD</span>
+            </a>
+
+            <div class="p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Cotizaciones Abiertas (COP)</span>
+                    <p class="text-base sm:text-lg font-extrabold text-slate-800 mt-0.5">
+                        ${{ "{:,.2f}".format(volumen_cot_cop) }} <span class="text-[10px] font-bold text-slate-500">COP</span>
+                    </p>
+                </div>
+                <span class="text-[10px] font-extrabold bg-blue-100 text-[#002060] px-2.5 py-1 rounded-lg">{{ total_cotizaciones }} COT.</span>
+            </div>
+
+            <div class="p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Cotizaciones Abiertas (USD)</span>
+                    <p class="text-base sm:text-lg font-extrabold text-slate-800 mt-0.5">
+                        ${{ "{:,.2f}".format(volumen_cot_usd) }} <span class="text-[10px] font-bold text-slate-500">USD</span>
+                    </p>
+                </div>
+                <span class="text-[10px] font-extrabold bg-sky-100 text-sky-800 px-2.5 py-1 rounded-lg">COT. USD</span>
+            </div>
+        </div>
+
+        <!-- BARRA DE INDICADORES DE ESTADO Y CUMPLIMIENTO (SIN BOTONES REDUNDANTES DE CAMBIO DE PESTAÑA) -->
+        <div class="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-200/80">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <a href="/pedidos?kpi=vencidas&asesor_id={{ asesor_f_activo }}"
+                   class="px-3 py-1.5 rounded-lg font-bold transition {% if f_kpi == 'vencidas' %}bg-rose-600 text-white{% else %}bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100{% endif %}">
+                    Con retraso: <strong>{{ total_vencidas }}</strong>
+                </a>
+                <a href="/pedidos?kpi=en_tiempo&asesor_id={{ asesor_f_activo }}"
+                   class="px-3 py-1.5 rounded-lg font-bold transition {% if f_kpi == 'en_tiempo' %}bg-emerald-600 text-white{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100{% endif %}">
+                    En tiempo: <strong>{{ total_en_proceso - total_vencidas }}</strong>
+                </a>
+                <a href="/pedidos?kpi=entregados&asesor_id={{ asesor_f_activo }}"
+                   class="px-3 py-1.5 rounded-lg font-bold transition {% if f_kpi == 'entregados' %}bg-blue-700 text-white{% else %}bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100{% endif %}">
+                    Entregadas: <strong>{{ total_entregados }}</strong>
+                </a>
+                <a href="/pedidos?kpi=cancelados&asesor_id={{ asesor_f_activo }}"
+                   class="px-3 py-1.5 rounded-lg font-bold transition {% if f_kpi == 'cancelados' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100{% endif %}">
+                    Canceladas: <strong>{{ total_cancelados }}</strong>
+                </a>
+            </div>
+
+            {% if semaforo_resumen %}
+            <div class="hidden md:flex items-center gap-1.5 overflow-x-auto max-w-full">
+                <span class="text-[10px] font-extrabold uppercase text-slate-400 mr-1 shrink-0">Inspección rápida:</span>
+                {% for sr in semaforo_resumen[:5] %}
+                <button type="button"
+                        @click="abrirPreview('{{ sr.uid }}')"
+                        class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold whitespace-nowrap transition hover:opacity-90
+                        {% if sr.color == 'rose' %}bg-rose-600 text-white
+                        {% elif sr.color == 'amber' %}bg-amber-400 text-slate-950
+                        {% elif sr.color == 'emerald' %}bg-emerald-600 text-white
+                        {% else %}bg-slate-600 text-white{% endif %}">
+                    {{ sr.etiqueta }}
+                </button>
+                {% endfor %}
+            </div>
             {% endif %}
-        {% endfor %}
+        </div>
 
-        {% if pagina_actual < total_paginas %}
-        <a href="/pedidos?page={{ pagina_actual + 1 }}{% if po_f %}&po={{ po_f }}{% endif %}{% if cliente_f %}&cliente={{ cliente_f }}{% endif %}{% if proveedor_f %}&proveedor={{ proveedor_f }}{% endif %}{% if asesor_f %}&asesor_id={{ asesor_f }}{% endif %}{% if tipo_f %}&tipo={{ tipo_f }}{% endif %}{% if estado_f %}&estado={{ estado_f }}{% endif %}{% if estado_prod_f %}&estado_producto={{ estado_prod_f }}{% endif %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
-            Siguiente
-        </a>
-        {% endif %}
+        <!-- BUSCADOR GUIADO PASO A PASO -->
+        <form method="get" action="/pedidos" class="pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
+            <div class="lg:col-span-2">
+                <label class="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Número PO o Cotización</label>
+                <input type="text" name="po" value="{{ f_po }}" placeholder="Ej. PO-2026 o Q-2026"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Cliente</label>
+                <input type="text" name="cliente" value="{{ f_cliente }}" list="dl-clientes" placeholder="Empresa o aerolínea..."
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                <datalist id="dl-clientes">
+                    {% for cli in lista_clientes %}
+                    <option value="{{ cli }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Proveedor o Part Number</label>
+                <input type="text" name="q" value="{{ q }}" list="dl-proveedores" placeholder="Proveedor o referencia..."
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                <datalist id="dl-proveedores">
+                    {% for prv in lista_proveedores %}
+                    <option value="{{ prv }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            {% if es_rol_superior %}
+            <div class="lg:col-span-3">
+                <label class="block text-[10px] font-extrabold text-[#002060] uppercase mb-1">Responsable de Cartera</label>
+                <select name="asesor_id" onchange="this.form.submit()"
+                        class="w-full px-3 py-2 border border-[#002060]/40 bg-blue-50/40 rounded-xl text-xs font-bold text-[#002060] focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                    <option value="{{ user.id }}" {% if asesor_f_activo == (user.id|string) %}selected{% endif %}>
+                        Mis Órdenes ({{ user.nombre }})
+                    </option>
+                    <option value="todos" {% if asesor_f_activo == 'todos' %}selected{% endif %}>
+                        Ver Todo el Equipo ({{ asesores_visibles|length }} usuarios)
+                    </option>
+                    {% for a in asesores_visibles %}
+                        {% if a.id != user.id %}
+                        <option value="{{ a.id }}" {% if asesor_f_activo == (a.id|string) %}selected{% endif %}>
+                            {{ a.nombre }} — {{ a.rol }}
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <input type="hidden" name="asesor_id" value="{{ user.id }}">
+            {% endif %}
+
+            <div class="{% if es_rol_superior %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
+                <label class="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Operación</label>
+                <select name="tipo" class="w-full px-2.5 py-2 border border-slate-300 rounded-xl text-xs bg-white">
+                    <option value="">Todas</option>
+                    <option value="Nacional" {% if f_tipo == 'Nacional' %}selected{% endif %}>Nacional</option>
+                    <option value="Internacional" {% if f_tipo == 'Internacional' %}selected{% endif %}>Internacional</option>
+                </select>
+            </div>
+
+            <div class="{% if es_rol_superior %}lg:col-span-1{% else %}lg:col-span-2{% endif %}">
+                <label class="block text-[10px] font-extrabold text-slate-500 uppercase mb-1">Estado PO</label>
+                <select name="estado" class="w-full px-2.5 py-2 border border-slate-300 rounded-xl text-xs bg-white">
+                    <option value="">Todos</option>
+                    {% for e in estados %}
+                    <option value="{{ e }}" {% if f_estado == e %}selected{% endif %}>{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="{% if es_rol_superior %}lg:col-span-1{% else %}lg:col-span-2{% endif %} flex gap-1.5">
+                <button type="submit" class="flex-1 bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2 px-3 rounded-xl text-xs transition">
+                    Buscar
+                </button>
+                <a href="/pedidos" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-2.5 rounded-xl text-xs transition" title="Restablecer filtros">
+                    Limpiar
+                </a>
+            </div>
+        </form>
     </div>
-</div>
-{% endif %}
 
+    <!-- ========================================================================= -->
+    <!-- 2. SECCIÓN: ÓRDENES DE COMPRA (PO)                                        -->
+    <!-- ========================================================================= -->
+    <div class="space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div class="flex items-center gap-2">
+                <span class="h-3 w-3 rounded-full bg-[#002060]"></span>
+                <h2 class="text-sm sm:text-base font-extrabold text-[#002060] uppercase tracking-wider">
+                    Órdenes de Compra Confirmadas
+                </h2>
+                <span class="bg-blue-100 text-[#002060] text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
+                    {{ total_pedidos_filtrados }} registradas
+                </span>
+            </div>
+            <span class="text-xs text-slate-500 font-medium">
+                Página {{ pagina_actual }} de {{ total_paginas }}
+            </span>
+        </div>
+
+        <!-- Vista de Tarjetas para Móvil y Tablet (< lg) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 lg:hidden">
+            {% for p in pedidos %}
+            {% set info = p.dias_habiles_info %}
+            {% set trk = p.tracking_info %}
+            {% set uid_po = 'PO-' ~ p.id %}
+            <div class="fly-card p-4 space-y-3 border-l-4 {% if p.estado == 'Cancelado' %}border-l-amber-500 bg-amber-50/20{% elif info.color == 'rose' %}border-l-rose-600{% elif info.color == 'amber' %}border-l-amber-400{% elif info.color == 'emerald' %}border-l-emerald-600{% else %}border-l-[#002060]{% endif %}">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <button type="button" @click="abrirPreview('{{ uid_po }}')"
+                                class="text-sm font-extrabold text-[#002060] hover:underline text-left">
+                            {{ p.po_codigo }}
+                        </button>
+                        <p class="text-xs font-bold text-slate-800 mt-0.5">{{ p.cliente.nombre if p.cliente else 'Sin cliente' }}</p>
+                        <p class="text-[11px] text-slate-500">Responsable: {{ p.asesor.nombre if p.asesor else 'Sin asignar' }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm font-extrabold text-slate-900 block">${{ "{:,.2f}".format(p.total) }} {{ p.moneda }}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">{{ p.tipo }}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="button"
+                            @click="abrirPreview('{{ uid_po }}')"
+                            class="w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-extrabold flex items-center justify-between
+                            {% if info.color == 'rose' %}bg-rose-600 text-white
+                            {% elif info.color == 'amber' %}bg-amber-400 text-slate-950
+                            {% elif info.color == 'emerald' %}bg-emerald-600 text-white
+                            {% elif info.color == 'orange' %}bg-amber-100 text-amber-900 border border-amber-300
+                            {% else %}bg-slate-600 text-white{% endif %}">
+                        <span>{{ info.etiqueta }}</span>
+                        <span class="underline ml-2">Ver detalle</span>
+                    </button>
+                </div>
+
+                <div class="text-[11px] text-slate-600 flex flex-wrap justify-between gap-2 pt-1 border-t border-slate-100">
+                    <span>Promesa: <strong>{{ p.plazo_entrega.isoformat() if p.plazo_entrega else 'Por definir' }}</strong></span>
+                    <span>Estado: <strong>{{ p.estado }}</strong></span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-slate-100">
+                    <button type="button" @click="abrirPreview('{{ uid_po }}')"
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                        Inspeccionar
+                    </button>
+                    <a href="/pedidos/{{ p.id }}/editar"
+                       class="bg-blue-50 hover:bg-blue-100 text-[#002060] px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                        Editar
+                    </a>
+                    <a href="/pedidos/{{ p.id }}/excel"
+                       class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                        Excel
+                    </a>
+                    {% if p.drive_link or p.drive_folder_link %}
+                    <a href="{{ p.drive_link or p.drive_folder_link }}" target="_blank"
+                       class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shadow-xs"
+                       title="Abrir expediente en Google Drive">
+                        Drive
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="col-span-full fly-card p-8 text-center">
+                <p class="text-sm font-bold text-slate-700">No se encontraron Órdenes de Compra con los filtros actuales.</p>
+                <a href="/pedidos/nuevo" class="inline-block mt-3 bg-[#002060] text-white text-xs font-extrabold px-4 py-2 rounded-xl">
+                    + Crear Nueva Orden de Compra
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Tabla de Escritorio Completa (>= lg) -->
+        <div class="hidden lg:block fly-card overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#002060] text-white text-[10px] font-extrabold uppercase tracking-wider">
+                            <th class="py-3.5 px-4">Orden PO / Plazo de Entrega</th>
+                            <th class="py-3.5 px-3">Cliente</th>
+                            <th class="py-3.5 px-3">Repuestos, Proveedor, IVA y Guía de Transporte</th>
+                            <th class="py-3.5 px-3 text-center">Operación / Pago</th>
+                            <th class="py-3.5 px-3">Responsable</th>
+                            <th class="py-3.5 px-3">Compromiso</th>
+                            <th class="py-3.5 px-3 text-right">Total PO</th>
+                            <th class="py-3.5 px-4 text-right">Gestión</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/80 text-xs">
+                        {% for p in pedidos %}
+                        {% set info = p.dias_habiles_info %}
+                        {% set trk = p.tracking_info %}
+                        {% set uid_po = 'PO-' ~ p.id %}
+                        <tr class="hover:bg-blue-50/40 transition align-top {% if p.estado == 'Cancelado' %}bg-amber-50/30{% endif %}">
+                            <!-- 1. PO + Semáforo -->
+                            <td class="py-3.5 px-4">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-100 text-[#002060]">PO</span>
+                                    <button type="button"
+                                            @click="abrirPreview('{{ uid_po }}')"
+                                            class="font-extrabold text-[#002060] text-sm hover:underline text-left">
+                                        {{ p.po_codigo }}
+                                    </button>
+                                </div>
+
+                                <div class="mt-1.5">
+                                    <button type="button"
+                                            @click="abrirPreview('{{ uid_po }}')"
+                                            title="Haz clic para abrir el resumen completo de esta orden"
+                                            class="text-left inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-extrabold tracking-wide shadow-sm transition hover:scale-[1.01] cursor-pointer
+                                            {% if info.color == 'rose' %}bg-rose-600 text-white
+                                            {% elif info.color == 'amber' %}bg-amber-400 text-slate-950
+                                            {% elif info.color == 'emerald' %}bg-emerald-600 text-white
+                                            {% elif info.color == 'orange' %}bg-amber-100 text-amber-900 border border-amber-300
+                                            {% else %}bg-slate-600 text-white{% endif %}">
+                                        <span>{{ info.etiqueta }}</span>
+                                        <span class="opacity-85 underline text-[9px]">[Inspeccionar]</span>
+                                    </button>
+                                </div>
+
+                                <div class="text-[11px] text-slate-500 mt-1">
+                                    Apertura: {{ p.fecha_inicial.isoformat() if p.fecha_inicial else '' }}
+                                </div>
+                                <div class="mt-1">
+                                    <span class="text-[10px] font-bold text-slate-600">
+                                        Estado: <strong class="text-slate-900">{{ p.estado }}</strong>
+                                    </span>
+                                </div>
+
+                                {% if p.estado == 'Cancelado' and p.motivo_cancelacion %}
+                                <div class="mt-1.5 p-2 rounded-lg bg-amber-100/80 border border-amber-300 text-[10px] text-amber-950 max-w-[230px]">
+                                    <span class="font-extrabold uppercase block">Historial Retenido:</span>
+                                    {{ p.motivo_cancelacion }}
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- 2. Cliente -->
+                            <td class="py-3.5 px-3">
+                                <div class="font-bold text-slate-900">{{ p.cliente.nombre if p.cliente else 'Sin cliente' }}</div>
+                                {% if p.numero_remision %}
+                                <div class="text-[11px] text-slate-500 mt-0.5">Remisión: {{ p.numero_remision }}</div>
+                                {% endif %}
+                                {% if p.cotizacion_origen %}
+                                <div class="mt-1 inline-block bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    Origen: {{ p.cotizacion_origen.codigo_cotizacion }}
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- 3. Repuestos, Proveedor y Guía -->
+                            <td class="py-3.5 px-3 max-w-md">
+                                <div class="mb-2">
+                                    {% if trk.tiene_codigo %}
+                                        <div class="inline-flex flex-wrap items-center gap-1.5 bg-sky-50 border border-sky-200 text-sky-950 px-2.5 py-1 rounded-lg text-[10px] font-bold">
+                                            <span class="font-extrabold text-[#002060]">{{ trk.transportadora }}:</span>
+                                            <span class="font-mono-code">{{ trk.codigo }}</span>
+                                            {% if trk.url %}
+                                            <a href="{{ trk.url }}" target="_blank" rel="noopener"
+                                               class="bg-[#002060] hover:bg-blue-800 text-white px-2 py-0.5 rounded text-[9px] font-extrabold transition">
+                                                Rastrear envío
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="inline-block bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                            Sin número de guía registrado
+                                        </span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="space-y-1">
+                                    {% for it in p.items[:3] %}
+                                    <div class="text-[11px] bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1 flex items-center justify-between gap-2">
+                                        <div class="truncate">
+                                            <span class="font-extrabold text-slate-800">{{ it.parte_numero }}</span>
+                                            <span class="text-slate-500">— {{ it.descripcion }}</span>
+                                            <span class="text-[10px] text-slate-400">({{ it.proveedor }})</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 shrink-0">
+                                            {% if it.es_exento_iva %}
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800">EXENTO 0%</span>
+                                            {% else %}
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">{{ "{:g}".format(it.iva_porcentaje or 0) }}%</span>
+                                            {% endif %}
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-white border border-slate-200 text-slate-700">
+                                                {{ it.estado_producto }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                    {% if p.items|length > 3 %}
+                                    <button type="button" @click="abrirPreview('{{ uid_po }}')"
+                                            class="text-[10px] font-extrabold text-[#002060] hover:underline">
+                                        + Ver los {{ p.items|length - 3 }} repuestos adicionales...
+                                    </button>
+                                    {% endif %}
+                                </div>
+
+                                {% if p.lista_documentos %}
+                                <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                    {% for doc in p.lista_documentos %}
+                                    <button type="button"
+                                            @click="abrirVisorEnModal('{{ uid_po }}', `/pedidos/{{ p.id }}/documento/preview?nombre={{ doc.nombre_archivo | urlencode }}`, '{{ doc.nombre_archivo }}')"
+                                            class="inline-flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 px-2 py-0.5 rounded text-[10px] font-bold transition">
+                                        <span>Ver soporte: {{ doc.nombre_archivo[:20] }}</span>
+                                    </button>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- 4. Operación / Pago -->
+                            <td class="py-3.5 px-3 text-center">
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold
+                                    {% if p.tipo == 'Nacional' %}bg-blue-100 text-[#002060]{% else %}bg-sky-100 text-sky-900{% endif %}">
+                                    {{ p.tipo }} ({{ p.moneda }})
+                                </span>
+                                <div class="text-[10px] text-slate-600 font-semibold mt-1">
+                                    {{ p.metodo_pago or 'Pago por definir' }}
+                                </div>
+                                {% set prog = p.progreso_operativo %}
+                                <div class="mt-2 max-w-[140px] mx-auto">
+                                    <div class="grid grid-cols-5 gap-1">
+                                        {% for st in prog.etapas %}
+                                        <div class="h-1.5 rounded-full {% if st.completado %}bg-[#002060]{% else %}bg-slate-200{% endif %}"
+                                             title="{{ st.nombre }}"></div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="text-[9px] font-bold text-slate-500 mt-1">
+                                        Etapa {{ prog.indice_actual }}/5: {{ prog.etapa_actual }}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 5. Responsable -->
+                            <td class="py-3.5 px-3">
+                                <div class="font-bold text-slate-800">{{ p.asesor.nombre if p.asesor else 'Sin asignar' }}</div>
+                                <div class="text-[10px] text-slate-500">{{ p.asesor.rol if p.asesor else '' }}</div>
+                            </td>
+
+                            <!-- 6. Compromiso -->
+                            <td class="py-3.5 px-3">
+                                <div class="text-[11px] font-semibold text-slate-700">
+                                    Promesa: <strong>{{ p.plazo_entrega.isoformat() if p.plazo_entrega else 'Sin fecha' }}</strong>
+                                </div>
+                                {% if p.fecha_entrega_cliente %}
+                                <div class="text-[10px] text-emerald-700 font-bold mt-0.5">
+                                    Entregado: {{ p.fecha_entrega_cliente.isoformat() }}
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- 7. Total PO -->
+                            <td class="py-3.5 px-3 text-right whitespace-nowrap">
+                                <div class="font-extrabold text-slate-900 text-sm">
+                                    ${{ "{:,.2f}".format(p.total) }}
+                                </div>
+                                <div class="text-[10px] font-bold text-slate-500">{{ p.moneda }}</div>
+                                {% if p.total_hazmat > 0 or p.total_certificados > 0 %}
+                                <div class="text-[9px] text-amber-800 font-bold mt-0.5">
+                                    Incluye cargos especiales
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- 8. Gestión -->
+                            <td class="py-3.5 px-4 text-right">
+                                <div class="flex flex-wrap justify-end gap-1 max-w-[190px] ml-auto">
+                                    <button type="button"
+                                            @click="abrirPreview('{{ uid_po }}')"
+                                            class="bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1 rounded-lg text-[10px] font-bold transition">
+                                        Inspeccionar
+                                    </button>
+                                    <a href="/pedidos/{{ p.id }}/editar"
+                                       class="bg-blue-50 hover:bg-blue-100 text-[#002060] px-2.5 py-1 rounded-lg text-[10px] font-bold transition">
+                                        Editar
+                                    </a>
+                                    <a href="/pedidos/{{ p.id }}/excel"
+                                       class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg text-[10px] font-bold transition">
+                                        Excel
+                                    </a>
+                                    {% if p.drive_link or p.drive_folder_link %}
+                                    <a href="{{ p.drive_link or p.drive_folder_link }}" target="_blank"
+                                       class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-[10px] font-bold transition inline-flex items-center gap-1 shadow-xs"
+                                       title="Abrir expediente en Google Drive">
+                                        Drive
+                                    </a>
+                                    {% endif %}
+
+                                    {% if p.estado != 'Cancelado' %}
+                                    <button type="button"
+                                             @click="abrirModalCancelar({{ p.id }}, '{{ p.po_codigo }}')"
+                                             class="bg-amber-50 hover:bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-[10px] font-bold transition">
+                                         Cancelar PO
+                                     </button>
+                                     {% elif user.rol in ['Gerencia', 'Administrador'] %}
+                                     <form method="post" action="/pedidos/{{ p.id }}/reactivar" class="inline">
+                                         <input type="hidden" name="motivo_reactivacion" value="Reactivación autorizada desde Centro de Operaciones">
+                                         <button type="submit"
+                                                 class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition">
+                                             Reactivar PO
+                                         </button>
+                                     </form>
+                                     {% endif %}
+
+                                     {% if es_rol_superior %}
+                                     <button type="button"
+                                             @click="abrirModalCorreo({{ p.id }}, '{{ p.po_codigo }}', '{{ p.cliente.nombre if p.cliente else '' }}')"
+                                             class="bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg text-[10px] font-bold transition">
+                                         Correo
+                                     </button>
+                                     {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="py-10 text-center text-slate-500">
+                                <p class="text-sm font-bold text-slate-700">No se encontraron Órdenes de Compra (PO) con los filtros actuales.</p>
+                                <p class="text-xs text-slate-400 mt-1">Puedes limpiar los filtros o registrar una nueva orden de compra.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación de Órdenes de Compra (PO) -->
+            {% if total_paginas > 1 %}
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="text-slate-600 font-medium">
+                    Mostrando página <strong>{{ pagina_actual }}</strong> de <strong>{{ total_paginas }}</strong> ({{ total_pedidos_filtrados }} órdenes en total)
+                </span>
+                <div class="flex items-center gap-1.5">
+                    {% if pagina_actual > 1 %}
+                    <a href="/pedidos?page={{ pagina_actual - 1 }}&cot_page={{ cot_pagina_actual }}&asesor_id={{ asesor_f_activo }}&tipo={{ f_tipo }}&estado={{ f_estado }}&q={{ q }}&po={{ f_po }}&cliente={{ f_cliente }}"
+                       class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-100">
+                        Anterior
+                    </a>
+                    {% endif %}
+                    {% for pg in range(1, total_paginas + 1) %}
+                        {% if pg == pagina_actual %}
+                        <span class="px-3 py-1.5 rounded-lg bg-[#002060] text-white font-extrabold">{{ pg }}</span>
+                        {% elif pg <= 3 or pg > total_paginas - 2 or (pg >= pagina_actual - 1 and pg <= pagina_actual + 1) %}
+                        <a href="/pedidos?page={{ pg }}&cot_page={{ cot_pagina_actual }}&asesor_id={{ asesor_f_activo }}&tipo={{ f_tipo }}&estado={{ f_estado }}&q={{ q }}&po={{ f_po }}&cliente={{ f_cliente }}"
+                           class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-100">
+                            {{ pg }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+                    {% if pagina_actual < total_paginas %}
+                    <a href="/pedidos?page={{ pagina_actual + 1 }}&cot_page={{ cot_pagina_actual }}&asesor_id={{ asesor_f_activo }}&tipo={{ f_tipo }}&estado={{ f_estado }}&q={{ q }}&po={{ f_po }}&cliente={{ f_cliente }}"
+                       class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-100">
+                        Siguiente
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 3. SECCIÓN: COTIZACIONES ENVIADAS A CLIENTES                              -->
+    <!-- ========================================================================= -->
+    <div class="space-y-3 pt-2">
+        <!-- Encabezado limpio (Sin el texto no solicitado del lado derecho) -->
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div class="flex items-center gap-2">
+                <span class="h-3 w-3 rounded-full bg-sky-600"></span>
+                <h2 class="text-sm sm:text-base font-extrabold text-[#002060] uppercase tracking-wider">
+                    Cotizaciones Enviadas a Clientes
+                </h2>
+                <span class="bg-sky-100 text-sky-900 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
+                    {{ total_cotizaciones_filtradas }} emitidas
+                </span>
+            </div>
+        </div>
+
+        <!-- Tarjetas de Cotizaciones para Móvil y Tablet (< lg) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 lg:hidden">
+            {% for c in cotizaciones %}
+            {% set cinfo = c.dias_habiles_info %}
+            {% set uid_cot = 'COT-' ~ c.id %}
+            <div class="fly-card p-4 space-y-2.5 border-l-4 border-l-sky-600">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <button type="button" @click="abrirPreview('{{ uid_cot }}')"
+                                class="text-sm font-extrabold text-[#002060] hover:underline text-left">
+                            {{ c.codigo_cotizacion }}
+                        </button>
+                        <p class="text-xs font-bold text-slate-800">{{ c.empresa }}</p>
+                        <p class="text-[11px] text-slate-500">Asesor: {{ c.asesor.nombre if c.asesor else c.prepared_by }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm font-extrabold text-slate-900 block">${{ "{:,.2f}".format(c.total) }}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800">{{ c.moneda }}</span>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-slate-100">
+                    <button type="button" @click="abrirPreview('{{ uid_cot }}')"
+                            class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                        Vista Previa
+                    </button>
+                    <a href="/pedidos/nuevo?cot_id={{ c.id }}"
+                       class="bg-[#1B4F9C] text-white px-2.5 py-1 rounded-lg text-[11px] font-extrabold">
+                        Convertir a PO
+                    </a>
+                    <a href="/cotizaciones/{{ c.id }}/excel"
+                       class="bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-extrabold">
+                        Excel V4
+                    </a>
+                    {% if c.drive_link %}
+                    <a href="{{ c.drive_link }}" target="_blank"
+                       class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shadow-xs"
+                       title="Ver cotización en Google Drive">
+                        Drive
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="col-span-full fly-card p-6 text-center text-xs text-slate-500">
+                No hay cotizaciones registradas con los filtros seleccionados.
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Tabla de Cotizaciones para Escritorio (>= lg) -->
+        <div class="hidden lg:block fly-card overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                            <th class="py-3 px-4">Cotización / Vigencia</th>
+                            <th class="py-3 px-3">Cliente / Contacto</th>
+                            <th class="py-3 px-3">Ítems Cotizados y Cargos Especiales</th>
+                            <th class="py-3 px-3 text-center">Divisa</th>
+                            <th class="py-3 px-3">Preparado Por</th>
+                            <th class="py-3 px-3">Emisión / Expira</th>
+                            <th class="py-3 px-3 text-right">Total Cotizado</th>
+                            <th class="py-3 px-4 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/80 text-xs">
+                        {% for c in cotizaciones %}
+                        {% set cinfo = c.dias_habiles_info %}
+                        {% set uid_cot = 'COT-' ~ c.id %}
+                        <tr class="hover:bg-sky-50/40 transition align-top">
+                            <td class="py-3 px-4">
+                                <button type="button"
+                                        @click="abrirPreview('{{ uid_cot }}')"
+                                        class="font-extrabold text-[#002060] text-sm hover:underline">
+                                    {{ c.codigo_cotizacion }}
+                                </button>
+                                <div class="mt-1">
+                                    <button type="button"
+                                            @click="abrirPreview('{{ uid_cot }}')"
+                                            class="px-2 py-0.5 rounded text-[10px] font-extrabold
+                                            {% if cinfo.color == 'rose' %}bg-rose-600 text-white
+                                            {% elif cinfo.color == 'amber' %}bg-amber-400 text-slate-950
+                                            {% elif cinfo.color == 'emerald' %}bg-emerald-600 text-white
+                                            {% else %}bg-blue-600 text-white{% endif %}">
+                                        {{ cinfo.etiqueta }} [Vista Previa]
+                                    </button>
+                                </div>
+                            </td>
+
+                            <td class="py-3 px-3">
+                                <div class="font-bold text-slate-900">{{ c.empresa }}</div>
+                                <div class="text-[11px] text-slate-500">
+                                    Contacto: {{ c.contact or 'N/A' }} | Ref: {{ c.ref_no or 'S/R' }}
+                                </div>
+                            </td>
+
+                            <td class="py-3 px-3 max-w-md">
+                                <div class="space-y-1">
+                                    {% for cit in c.items[:2] %}
+                                    <div class="text-[11px] bg-slate-50 border border-slate-200/80 rounded px-2 py-1 flex items-center justify-between">
+                                        <span class="font-semibold text-slate-800 truncate">{{ cit.description }}</span>
+                                        <span class="text-[10px] font-bold text-slate-600 shrink-0 ml-2">
+                                            {{ "{:g}".format(cit.qty or 1) }} {{ cit.unit or 'UND' }} × ${{ "{:,.2f}".format(cit.unit_price or 0) }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                    {% if c.items|length > 2 %}
+                                    <span class="text-[10px] text-slate-500 font-bold">+ {{ c.items|length - 2 }} ítems adicionales</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+
+                            <td class="py-3 px-3 text-center">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    {{ c.moneda }}
+                                </span>
+                            </td>
+
+                            <td class="py-3 px-3">
+                                <div class="font-semibold text-slate-800">{{ c.asesor.nombre if c.asesor else c.prepared_by }}</div>
+                            </td>
+
+                            <td class="py-3 px-3">
+                                <div class="text-[11px] text-slate-600">Emisión: <strong>{{ c.fecha.isoformat() if c.fecha else '' }}</strong></div>
+                                <div class="text-[11px] text-slate-600">Expira: <strong>{{ c.fecha_expiracion.isoformat() if c.fecha_expiracion else 'N/A' }}</strong></div>
+                            </td>
+
+                            <td class="py-3 px-3 text-right whitespace-nowrap">
+                                <div class="font-extrabold text-slate-900 text-sm">${{ "{:,.2f}".format(c.total) }}</div>
+                                <div class="text-[10px] font-bold text-slate-500">{{ c.moneda }}</div>
+                            </td>
+
+                            <td class="py-3 px-4 text-right">
+                                <div class="flex flex-wrap justify-end gap-1">
+                                    <button type="button"
+                                            @click="abrirPreview('{{ uid_cot }}')"
+                                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-bold">
+                                        Vista Previa
+                                    </button>
+                                    <a href="/pedidos/nuevo?cot_id={{ c.id }}"
+                                       class="bg-[#1B4F9C] hover:bg-[#002060] text-white px-2.5 py-1 rounded-lg text-[10px] font-extrabold">
+                                        Convertir a PO
+                                    </a>
+                                    <a href="/cotizaciones/{{ c.id }}/excel"
+                                       class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-extrabold">
+                                        Excel V4
+                                    </a>
+                                    {% if c.drive_link %}
+                                    <a href="{{ c.drive_link }}" target="_blank"
+                                       class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 shadow-xs"
+                                       title="Ver cotización en Google Drive">
+                                        Drive
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-slate-500 text-xs">
+                                No hay cotizaciones registradas para este filtro. Usa el botón «+ Nueva Cotización» para generar una.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación de Cotizaciones -->
+            {% if cot_total_paginas > 1 %}
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="text-slate-600 font-medium">
+                    Página de cotizaciones <strong>{{ cot_pagina_actual }}</strong> de <strong>{{ cot_total_paginas }}</strong>
+                </span>
+                <div class="flex items-center gap-1.5">
+                    {% if cot_pagina_actual > 1 %}
+                    <a href="/pedidos?page={{ pagina_actual }}&cot_page={{ cot_pagina_actual - 1 }}&asesor_id={{ asesor_f_activo }}"
+                       class="px-3 py-1 rounded-lg bg-white border border-slate-300 font-bold text-slate-700">
+                        Anterior
+                    </a>
+                    {% endif %}
+                    {% if cot_pagina_actual < cot_total_paginas %}
+                    <a href="/pedidos?page={{ pagina_actual }}&cot_page={{ cot_pagina_actual + 1 }}&asesor_id={{ asesor_f_activo }}"
+                       class="px-3 py-1 rounded-lg bg-white border border-slate-300 font-bold text-slate-700">
+                        Siguiente
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 4. MODAL DE INSPECCIÓN Y VISTA PREVIA (SIN DUPLICADOS NI ELEMENTOS EXTRA) -->
+    <!-- ========================================================================= -->
+    <div x-show="modalPreview" x-cloak
+         class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+         @keydown.escape.window="modalPreview = false; visorDocUrl = ''">
+        <div class="bg-white rounded-2xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+             @click.outside="modalPreview = false; visorDocUrl = ''">
+            <div class="bg-[#002060] text-white px-5 sm:px-6 py-4 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-sky-300"
+                          x-text="previewData.kind === 'COTIZACION' ? 'Ficha de Cotización Comercial' : 'Inspección Detallada de Orden de Compra (PO)'"></span>
+                    <h3 class="text-base sm:text-lg font-extrabold mt-0.5"
+                        x-text="(previewData.codigo || '') + ' — ' + (previewData.cliente || '')"></h3>
+                </div>
+                <button type="button" @click="modalPreview = false; visorDocUrl = ''"
+                        class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+                    Cerrar
+                </button>
+            </div>
+
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
+                <!-- Resumen Principal -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">Operación y Estado</span>
+                        <span class="font-extrabold text-[#002060]" x-text="(previewData.tipo || '') + ' | ' + (previewData.estado || '')"></span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">Responsable</span>
+                        <span class="font-bold text-slate-800" x-text="previewData.asesor || ''"></span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">Apertura / Compromiso</span>
+                        <span class="font-bold text-slate-800" x-text="(previewData.fecha_inicial || '') + ' / ' + (previewData.plazo_entrega || '')"></span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">Valor Total</span>
+                        <span class="font-extrabold text-emerald-700 text-sm"
+                              x-text="'$' + Number(previewData.total || 0).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' ' + (previewData.moneda || '')"></span>
+                    </div>
+                </div>
+
+                <!-- Soportes Adjuntos Reales (SOLO aparece en Órdenes PO que tengan archivos subidos) -->
+                <template x-if="previewData.kind === 'PO' && previewData.documentos && previewData.documentos.length > 0">
+                    <div class="bg-indigo-50/60 border border-indigo-200 rounded-xl p-4 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <span class="text-[10px] font-extrabold text-indigo-950 uppercase block">
+                                    Archivos de Soporte Adjuntos a esta Orden
+                                </span>
+                                <span class="text-[11px] text-slate-600">
+                                    Haz clic en «Previsualizar» para ver el archivo aquí mismo o en «Descargar» para guardarlo en tu equipo.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <template x-for="(doc, idx) in previewData.documentos" :key="idx">
+                                <div class="bg-white border border-indigo-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-sm">
+                                    <div class="truncate">
+                                        <span class="font-bold text-slate-800 block truncate" x-text="doc.nombre"></span>
+                                        <span class="text-[10px] text-slate-400 uppercase font-semibold" x-text="doc.extension || 'Archivo'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button"
+                                                @click="visorDocUrl = doc.url_preview; visorDocNombre = doc.nombre"
+                                                class="bg-[#002060] hover:bg-blue-900 text-white px-2.5 py-1 rounded-lg text-[10px] font-extrabold">
+                                            Previsualizar
+                                        </button>
+                                        <a :href="doc.url"
+                                           class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-bold">
+                                            Descargar
+                                        </a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <template x-if="visorDocUrl">
+                            <div class="mt-3 border-2 border-[#002060] rounded-xl overflow-hidden bg-slate-900 shadow-lg">
+                                <div class="bg-[#002060] text-white px-3.5 py-2 flex items-center justify-between">
+                                    <span class="text-[11px] font-extrabold truncate" x-text="'Archivo en pantalla: ' + (visorDocNombre || '')"></span>
+                                    <div class="flex items-center gap-2">
+                                        <a :href="visorDocUrl" target="_blank" rel="noopener"
+                                           class="text-[10px] font-bold text-sky-200 hover:text-white underline">
+                                            Abrir en pestaña nueva
+                                        </a>
+                                        <button type="button" @click="visorDocUrl = ''"
+                                                class="bg-white/15 hover:bg-white/25 text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                                            Ocultar visor
+                                        </button>
+                                    </div>
+                                </div>
+                                <iframe :src="visorDocUrl" class="w-full h-[360px] bg-white border-0"></iframe>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Tabla de Repuestos e Ítems -->
+                <div>
+                    <h4 class="text-[11px] font-extrabold uppercase text-slate-500 mb-2">
+                        Detalle de Repuestos, Cantidades, Cargos Especiales e Impuestos
+                    </h4>
+                    <div class="border border-slate-200 rounded-xl overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase">
+                                    <th class="py-2.5 px-3">Part Number / Descripción</th>
+                                    <th class="py-2.5 px-3">Proveedor / Notas</th>
+                                    <th class="py-2.5 px-3 text-right">Cant.</th>
+                                    <th class="py-2.5 px-3 text-right">Unitario</th>
+                                    <th class="py-2.5 px-3 text-right">Hazmat / Cert.</th>
+                                    <th class="py-2.5 px-3 text-center">IVA / TAX</th>
+                                    <th class="py-2.5 px-3 text-right">Total Línea</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200">
+                                <template x-for="(it, idx) in (previewData.items || [])" :key="idx">
+                                    <tr>
+                                        <td class="py-2 px-3">
+                                            <span class="font-bold text-[#002060]" x-text="it.parte_numero"></span>
+                                            <span class="text-slate-600 block text-[11px]" x-text="it.descripcion"></span>
+                                        </td>
+                                        <td class="py-2 px-3 text-slate-600" x-text="it.proveedor"></td>
+                                        <td class="py-2 px-3 text-right font-bold" x-text="it.cantidad"></td>
+                                        <td class="py-2 px-3 text-right" x-text="'$' + Number(it.precio_unitario || 0).toLocaleString('en-US', {minimumFractionDigits: 2})"></td>
+                                        <td class="py-2 px-3 text-right text-amber-800"
+                                            x-text="'$' + Number((it.cobro_hazmat || 0) + (it.cobro_certificado || 0)).toLocaleString('en-US', {minimumFractionDigits: 2})"></td>
+                                        <td class="py-2 px-3 text-center">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                                                  :class="it.sin_iva ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'"
+                                                  x-text="it.iva"></span>
+                                        </td>
+                                        <td class="py-2 px-3 text-right font-extrabold text-slate-900"
+                                            x-text="'$' + Number(it.total || 0).toLocaleString('en-US', {minimumFractionDigits: 2})"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Historial de Auditoría (Si existe) -->
+                <template x-if="previewData.historial && previewData.historial.length > 0">
+                    <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5">
+                        <span class="text-[10px] font-extrabold uppercase text-amber-900 block mb-2">
+                            Trazabilidad de Cambios de Estado
+                        </span>
+                        <div class="space-y-1.5">
+                            <template x-for="(h, hidx) in previewData.historial" :key="hidx">
+                                <div class="text-[11px] text-slate-700 flex flex-wrap justify-between gap-2 bg-white px-3 py-1.5 rounded-lg border border-amber-200/60">
+                                    <span>
+                                        <strong x-text="h.anterior + ' → ' + h.nuevo"></strong>
+                                        (<span x-text="h.motivo"></span>)
+                                    </span>
+                                    <span class="text-slate-500 font-mono-code" x-text="h.fecha + ' · ' + h.usuario"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Barra Inferior Única de Acciones (Sin botones duplicados) -->
+            <div class="px-5 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div class="text-xs text-slate-500">
+                    Estado de plazo: <strong class="text-slate-800" x-text="previewData.semaforo_etiqueta || ''"></strong>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a :href="previewData.url_excel || '#'"
+                       class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl text-xs transition">
+                        Descargar Excel Oficial
+                    </a>
+                    <a :href="previewData.url_editar || '#'"
+                       class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold px-4 py-2 rounded-xl text-xs transition"
+                       x-text="previewData.kind === 'COTIZACION' ? 'Convertir a Orden (PO)' : 'Editar Orden (PO)'">
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 5. MODAL DE CANCELACIÓN CON RETENCIÓN DE HISTORIAL                        -->
+    <!-- ========================================================================= -->
+    <div x-show="modalCancelar" x-cloak
+         class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+         @keydown.escape.window="modalCancelar = false">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden"
+             @click.outside="modalCancelar = false">
+            <div class="bg-amber-500 text-slate-950 px-6 py-4">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider block">Trazabilidad y Auditoría</span>
+                <h3 class="text-base font-extrabold mt-0.5">Cancelar Orden <span x-text="cancelPoCodigo"></span></h3>
+            </div>
+            <form :action="'/pedidos/' + cancelPoId + '/cancelar'" method="post" class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Al cancelar esta orden, sus datos no se borrarán: el registro pasará a estado <strong>Cancelado</strong> conservando la fecha, hora exacta y motivo en el historial de auditoría.
+                </p>
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                        Escribe el motivo de la cancelación
+                    </label>
+                    <textarea name="motivo_cancelacion" rows="3" required
+                              placeholder="Indica brevemente por qué se cancela esta orden de compra..."
+                              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="modalCancelar = false"
+                            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+                        Volver atrás
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold">
+                        Confirmar Cancelación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 6. MODAL DE ENVÍO DE CORREO                                               -->
+    <!-- ========================================================================= -->
+    <div x-show="modalCorreo" x-cloak
+         class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+         @keydown.escape.window="modalCorreo = false">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden"
+             @click.outside="modalCorreo = false">
+            <div class="bg-[#002060] text-white px-6 py-4">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-sky-300 block">Notificación Directa</span>
+                <h3 class="text-base font-extrabold mt-0.5">Enviar Ficha por Correo — <span x-text="correoPoCodigo"></span></h3>
+            </div>
+            <form :action="'/pedidos/' + correoPoId + '/enviar_correo'" method="post" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">Correo del destinatario</label>
+                    <input type="email" name="destino" value="{{ correo_oficial }}" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">Asunto del mensaje</label>
+                    <input type="text" name="asunto" :value="'Actualización Orden ' + correoPoCodigo + ' — ' + correoCliente"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">Nota adicional (Opcional)</label>
+                    <textarea name="mensaje" rows="3" placeholder="Escribe un comentario o instrucción para acompañar el reporte..."
+                              class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="modalCorreo = false"
+                            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs font-extrabold">
+                        Enviar Correo Ahora
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- Copyright © 2026 Fly Logistic. -->
 <script>
-function toggleItemsPO(id, restantes) {
-    const bloque = document.getElementById('items-extra-' + id);
-    const btn = document.getElementById('btn-items-' + id);
-    if (!bloque || !btn) return;
-    if (bloque.classList.contains('hidden')) {
-        bloque.classList.remove('hidden');
-        btn.textContent = 'Ocultar ítems adicionales';
-    } else {
-        bloque.classList.add('hidden');
-        btn.textContent = `Ver ${restantes} ítem(s) adicionales`;
-    }
-}
-function toggleItemsMovil(id, restantes) {
-    const bloque = document.getElementById('items-extra-movil-' + id);
-    const btn = document.getElementById('btn-items-movil-' + id);
-    if (!bloque || !btn) return;
-    if (bloque.classList.contains('hidden')) {
-        bloque.classList.remove('hidden');
-        btn.textContent = 'Ocultar ítems adicionales';
-    } else {
-        bloque.classList.add('hidden');
-        btn.textContent = `Ver ${restantes} ítem(s) adicionales`;
-    }
+const PREVIEW_MAP = {{ (preview_map_json or '{}') | safe }};
+
+function centroComando() {
+    return {
+        modalPreview: false,
+        previewData: {},
+        visorDocUrl: '',
+        visorDocNombre: '',
+        modalCancelar: false,
+        cancelPoId: null,
+        cancelPoCodigo: '',
+        modalCorreo: false,
+        correoPoId: null,
+        correoPoCodigo: '',
+        correoCliente: '',
+        abrirPreview(uid) {
+            if (PREVIEW_MAP && PREVIEW_MAP[uid]) {
+                this.previewData = PREVIEW_MAP[uid];
+                this.visorDocUrl = '';
+                this.visorDocNombre = '';
+                this.modalPreview = true;
+            }
+        },
+        abrirVisorEnModal(uid, urlPreview, nombreArchivo) {
+            if (PREVIEW_MAP && PREVIEW_MAP[uid]) {
+                this.previewData = PREVIEW_MAP[uid];
+            }
+            this.visorDocUrl = urlPreview;
+            this.visorDocNombre = nombreArchivo || 'Documento de Soporte';
+            this.modalPreview = true;
+        },
+        abrirModalCancelar(id, codigo) {
+            this.cancelPoId = id;
+            this.cancelPoCodigo = codigo;
+            this.modalCancelar = true;
+        },
+        abrirModalCorreo(id, codigo, cliente) {
+            this.correoPoId = id;
+            this.correoPoCodigo = codigo;
+            this.correoCliente = cliente;
+            this.modalCorreo = true;
+        }
+    };
 }
 </script>
 {% endblock %}

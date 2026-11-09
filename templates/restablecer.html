@@ -1,42 +1,87 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="max-w-md mx-auto mt-6 sm:mt-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-    <div class="fly-bg px-6 sm:px-8 py-6 text-center text-white">
-        <div class="inline-flex items-center justify-center bg-white px-4 py-2 rounded-xl shadow mb-3">
-            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-10 w-auto object-contain">
-        </div>
-        <h2 class="text-lg font-extrabold uppercase tracking-wider text-white">Asignar Nueva Contraseña</h2>
-        <p class="text-xs text-sky-200 mt-0.5">Actualización de credenciales de acceso</p>
-    </div>
+{% block title %}Definir Nueva Contraseña — Fly Logistic{% endblock %}
 
-    <div class="p-6 sm:p-8">
-        {% if not valido %}
-        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-4 rounded-lg text-xs font-semibold mb-5">
-            El enlace de restablecimiento no es válido o ha expirado. Solicite uno nuevo.
+{% block content %}
+<div class="min-h-[78vh] flex items-center justify-center px-3 py-8">
+    <div class="fly-card max-w-md w-full overflow-hidden border border-slate-200/90 shadow-2xl">
+
+        <!-- Encabezado de Restablecimiento -->
+        <div class="fly-header-gradient text-white px-6 py-6 text-center">
+            <div class="h-14 w-14 mx-auto rounded-2xl bg-white p-2 shadow-lg flex items-center justify-center mb-3">
+                <img src="{{ LOGO_SRC or '/logo_fly.webp' }}" onerror="this.onerror=null; this.src='/logo-empresa';" alt="Fly Logistic" class="max-h-full max-w-full object-contain">
+            </div>
+            <span class="inline-block text-[10px] font-extrabold uppercase tracking-widest px-3 py-0.5 rounded-full bg-white/15 text-sky-200 border border-sky-300/30">
+                Actualización de Credenciales
+            </span>
+            <h1 class="text-lg sm:text-xl font-extrabold text-white mt-1.5">
+                Elige tu Nueva Contraseña
+            </h1>
+            <p class="text-xs text-sky-100/90 mt-1">
+                Crea una contraseña segura de mínimo 8 caracteres para reactivar el acceso a tu cuenta.
+            </p>
         </div>
-        <div class="text-center">
-            <a href="/olvide" class="inline-block fly-bg text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">Solicitar Nuevo Enlace</a>
-        </div>
-        {% else %}
+
+        <div class="p-6 space-y-4 bg-white">
             {% if error %}
-            <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-5 text-xs font-semibold rounded">
+            <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold leading-relaxed">
                 {{ error }}
             </div>
             {% endif %}
-            <form method="post" action="" class="space-y-4">
+
+            {% if not valido or invalido %}
+            <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-3 text-xs">
+                <p class="font-extrabold uppercase text-amber-900">El enlace ha expirado o ya fue utilizado</p>
+                <p class="leading-relaxed">
+                    Por políticas de seguridad, los enlaces de recuperación tienen una validez de 30 minutos y son de uso único. Puedes generar uno nuevo en cualquier momento.
+                </p>
+                <a href="/olvide"
+                   class="inline-block w-full text-center py-2.5 px-4 rounded-xl bg-[#002060] text-white font-extrabold shadow-sm hover:bg-[#001540] transition">
+                    Solicitar un Nuevo Enlace
+                </a>
+            </div>
+            {% else %}
+            <form method="post" action="/restablecer/{{ token }}" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Nueva Contraseña (Mín. 8 caracteres)</label>
-                    <input type="password" name="password" minlength="8" required autofocus class="w-full h-10 px-3.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                    <label for="password" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 mb-1.5">
+                        1. Nueva Contraseña (Mínimo 8 caracteres)
+                    </label>
+                    <input type="password"
+                           id="password"
+                           name="password"
+                           minlength="8"
+                           required
+                           autofocus
+                           placeholder="Escribe tu nueva contraseña..."
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-[#002060] focus:outline-none transition">
                 </div>
+
                 <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Confirmar Nueva Contraseña</label>
-                    <input type="password" name="password2" minlength="8" required class="w-full h-10 px-3.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                    <label for="password2" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 mb-1.5">
+                        2. Confirmar Nueva Contraseña
+                    </label>
+                    <input type="password"
+                           id="password2"
+                           name="password2"
+                           minlength="8"
+                           required
+                           placeholder="Repite la nueva contraseña..."
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-[#002060] focus:outline-none transition">
                 </div>
-                <button type="submit" class="w-full py-3 rounded-lg text-white font-extrabold fly-bg fly-hover transition uppercase text-xs tracking-wider shadow">
+
+                <button type="submit"
+                        class="w-full py-3 px-4 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider shadow-md hover:shadow-lg transition">
                     Guardar Nueva Contraseña
                 </button>
             </form>
-        {% endif %}
+            {% endif %}
+
+            <div class="pt-3 border-t border-slate-200 text-center">
+                <a href="/login" class="text-xs font-extrabold text-[#002060] hover:underline">
+                    Volver al inicio de sesión
+                </a>
+            </div>
+        </div>
     </div>
 </div>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

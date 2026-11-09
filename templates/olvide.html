@@ -1,56 +1,82 @@
 {% extends "base.html" %}
+{% block title %}Recuperar Contraseña — Fly Logistic{% endblock %}
+
 {% block content %}
-<div class="max-w-md mx-auto mt-6 sm:mt-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-    <div class="fly-bg px-6 sm:px-8 py-6 text-center text-white">
-        <div class="inline-flex items-center justify-center bg-white px-4 py-2 rounded-xl shadow mb-3">
-            <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-10 w-auto object-contain">
-        </div>
-        <h2 class="text-lg font-extrabold uppercase tracking-wider text-white">Recuperación de Credenciales</h2>
-        <p class="text-[11px] text-sky-200 mt-0.5">Administración, Gerencia y Jefatura de Área</p>
-    </div>
+<div class="min-h-[78vh] flex items-center justify-center px-3 py-8">
+    <div class="fly-card max-w-md w-full overflow-hidden border border-slate-200/90 shadow-2xl">
 
-    <div class="p-6 sm:p-8">
-        {% if error %}
-        <div class="bg-red-50 border-l-4 border-red-600 text-red-700 p-3.5 mb-5 text-xs font-semibold rounded">
-            {{ error }}
+        <!-- Encabezado de Recuperación -->
+        <div class="fly-header-gradient text-white px-6 py-6 text-center">
+            <div class="h-14 w-14 mx-auto rounded-2xl bg-white p-2 shadow-lg flex items-center justify-center mb-3">
+                <img src="{{ LOGO_SRC or '/logo_fly.webp' }}" onerror="this.onerror=null; this.src='/logo-empresa';" alt="Fly Logistic" class="max-h-full max-w-full object-contain">
+            </div>
+            <span class="inline-block text-[10px] font-extrabold uppercase tracking-widest px-3 py-0.5 rounded-full bg-white/15 text-sky-200 border border-sky-300/30">
+                Seguridad y Credenciales
+            </span>
+            <h1 class="text-lg sm:text-xl font-extrabold text-white mt-1.5">
+                Recuperación de Contraseña
+            </h1>
+            <p class="text-xs text-sky-100/90 mt-1">
+                Ingresa tu usuario o correo electrónico corporativo para recibir un enlace de restablecimiento seguro.
+            </p>
         </div>
-        {% endif %}
 
-        {% if bloqueado_asesor %}
-        <div class="bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 text-xs rounded-lg space-y-2">
-            <p class="font-bold">Restablecimiento gestionado por Jefatura de Área</p>
-            <p>Por políticas de seguridad, las cuentas de <strong>Asesor</strong> son restablecidas directamente por <strong>{{ jefe_nombre }}</strong> desde el módulo de Usuarios.</p>
-        </div>
-        <div class="text-center">
-            <a href="/login" class="text-blue-700 font-bold text-xs hover:underline">Volver al inicio de sesión</a>
-        </div>
-        {% elif enviado %}
-        <div class="bg-emerald-50 border-l-4 border-emerald-600 text-emerald-800 p-4 mb-4 text-xs rounded space-y-2">
-            <p class="font-semibold">Solicitud procesada correctamente. Se han generado las instrucciones de recuperación para su cuenta directiva.</p>
-            {% if enlace_directo_prueba %}
-            <div class="pt-2 border-t border-emerald-200">
-                <p class="text-[11px] font-bold uppercase text-emerald-900 mb-1">Enlace de Restablecimiento:</p>
-                <a href="{{ enlace_directo_prueba }}" class="inline-block bg-emerald-700 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-emerald-800">Asignar Nueva Contraseña</a>
+        <div class="p-6 space-y-4 bg-white">
+            {% if error %}
+            <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold leading-relaxed">
+                {{ error }}
             </div>
             {% endif %}
-        </div>
-        <div class="text-center">
-            <a href="/login" class="text-blue-700 font-bold text-xs hover:underline">Volver al inicio de sesión</a>
-        </div>
-        {% else %}
-        <form method="post" action="/olvide" class="space-y-4">
-            <div>
-                <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Usuario o Correo Corporativo</label>
-                <input type="text" name="identificador" value="" placeholder="Ingrese su usuario o correo..." autocomplete="off" required autofocus class="w-full h-10 px-3.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002060] focus:outline-none">
+
+            {% if bloqueado_asesor %}
+            <div class="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-2 text-xs">
+                <p class="font-extrabold text-amber-900 uppercase">Restablecimiento Mediante Jefatura Directa</p>
+                <p class="leading-relaxed">
+                    Por políticas de seguridad operacional, los colaboradores con perfil Asesor o Almacenista deben solicitar el cambio o restablecimiento de su clave directamente a su <strong>{{ jefe_nombre or 'Jefe de Área o Administrador' }}</strong> desde el módulo de Gestión de Usuarios.
+                </p>
             </div>
-            <button type="submit" class="w-full py-3 rounded-lg text-white font-extrabold fly-bg fly-hover text-xs uppercase tracking-wider shadow">
-                Validar y Generar Enlace
-            </button>
-            <div class="text-center mt-3">
-                <a href="/login" class="text-xs text-blue-700 hover:underline font-semibold">Volver al Inicio de Sesión</a>
+            {% elif enviado %}
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 space-y-2 text-xs">
+                <p class="font-extrabold text-emerald-900 uppercase">Enlace de recuperación enviado</p>
+                <p class="leading-relaxed">
+                    Si el usuario o correo ingresado está registrado con perfil directivo, recibirás un mensaje con las instrucciones para restablecer tu clave. Revisa tu bandeja de entrada y la carpeta de correo no deseado.
+                </p>
+                {% if enlace_directo_prueba %}
+                <div class="p-2.5 rounded bg-slate-900 text-slate-100 text-[11px] font-mono-code break-all">
+                    Enlace de prueba: <a href="{{ enlace_directo_prueba }}" class="text-sky-300 underline">{{ enlace_directo_prueba }}</a>
+                </div>
+                {% endif %}
             </div>
-        </form>
-        {% endif %}
+            {% else %}
+            <form method="post" action="/olvide" class="space-y-4">
+                <div>
+                    <label for="identificador" class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700 mb-1.5">
+                        Escribe tu Usuario, Nombre o Correo Electrónico
+                    </label>
+                    <input type="text"
+                           id="identificador"
+                           name="identificador"
+                           required
+                           autofocus
+                           value="{{ valor or '' }}"
+                           placeholder="Ej. juan.martinez o correo@flylogistic.aero"
+                           class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-[#002060] focus:border-[#002060] focus:outline-none transition">
+                </div>
+
+                <button type="submit"
+                        class="w-full py-3 px-4 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs sm:text-sm font-extrabold uppercase tracking-wider shadow-md hover:shadow-lg transition">
+                    Enviar Enlace de Recuperación
+                </button>
+            </form>
+            {% endif %}
+
+            <div class="pt-3 border-t border-slate-200 text-center">
+                <a href="/login" class="text-xs font-extrabold text-[#002060] hover:underline">
+                    Volver a la pantalla de inicio de sesión
+                </a>
+            </div>
+        </div>
     </div>
 </div>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

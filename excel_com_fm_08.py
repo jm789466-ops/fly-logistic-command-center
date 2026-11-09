@@ -82,6 +82,17 @@ def _obtener_texto_documentacion(p) -> str:
     return doc_texto
 
 
+def _obtener_texto_tracking(p) -> str:
+    intl = getattr(p, "internacional", None)
+    raw_trk = (intl.tracking or "").strip() if intl else ""
+    info_trk = getattr(p, "tracking_info", None)
+    if isinstance(info_trk, dict) and info_trk.get("tiene_codigo"):
+        carrier = info_trk.get("transportadora") or ""
+        if carrier and carrier.upper() not in raw_trk.upper():
+            return f"{carrier}: {raw_trk}"
+    return raw_trk
+
+
 def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
     es_nacional = (p.tipo == "Nacional")
     intl = p.internacional
@@ -91,6 +102,7 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
     val_nac_por_item = round(val_nac_total / num_items, 2) if not es_nacional else 0.0
     semaforo = p.dias_habiles_info["detalle"]
     doc_texto = _obtener_texto_documentacion(p)
+    tracking_txt = _obtener_texto_tracking(p)
 
     relleno_fila = PatternFill("solid", fgColor=color_hex)
     borde_fino = Border(
@@ -121,7 +133,7 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
             item.descripcion,
             item.unidad_medida or "UND",
             int(item.cantidad),
-            getattr(item, "estado_producto", "PENDIENTE") or "PENDIENTE",
+            getattr(item, "estado_producto", "PENDIENTE DE PAGO") or "PENDIENTE DE PAGO",
             p.metodo_pago or "",
             float(item.precio_unitario),
             hazmat_val,
@@ -130,17 +142,26 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
             iva_pct,
         ]
 
+        obs_final = p.observaciones or ""
+        if p.estado == "Cancelado" and getattr(p, "motivo_cancelacion", None):
+            if p.motivo_cancelacion not in obs_final:
+                obs_final = f"{obs_final} [CANCELADO: {p.motivo_cancelacion}]".strip()
+
         if es_nacional:
             valor_despues = f"=Q{fila_actual}*(1+R{fila_actual}/100)"
+            remision_txt = p.numero_remision or ""
+            if getattr(p, "guia_nacional", None) and p.guia_nacional not in remision_txt:
+                carrier_nac = getattr(p, "transportadora_nacional", "") or "Guía"
+                remision_txt = f"{remision_txt} ({carrier_nac}: {p.guia_nacional})".strip()
             cola = [
                 valor_despues,
                 p.plazo_entrega,
                 semaforo,
                 p.fecha_entrega_cliente,
-                p.numero_remision or "",
+                remision_txt,
                 doc_texto,
                 p.estado,
-                p.observaciones or "",
+                obs_final,
             ]
             ws.append(base_fila + cola)
         else:
@@ -150,13 +171,13 @@ def _escribir_bloque_po_en_hoja(ws, p, fila_inicio: int, color_hex: str) -> int:
                 p.plazo_entrega,
                 semaforo,
                 intl.fecha_click_mail if intl else None,
-                (intl.tracking or "") if intl else "",
+                tracking_txt,
                 (intl.estado_nacionalizacion or "No aplica / Pendiente") if intl else "No aplica / Pendiente",
                 val_nac_por_item,
                 intl.fecha_nacionalizacion if intl else None,
                 doc_texto,
                 p.estado,
-                p.observaciones or "",
+                obs_final,
             ]
             ws.append(base_fila + cola)
 
@@ -334,10 +355,10 @@ def generar_excel_maestro_productos(ruta: str, pedidos: list):
                 float(it.subtotal_item),
                 iva_mostrar,
                 float(it.total_item),
-                it.estado_producto or "PENDIENTE",
+                it.estado_producto or "PENDIENTE DE PAGO",
             ])
             color_compra = "DCFCE7" if it.fecha_compra_proveedor else "FEE2E2"
-            color_est = "FEE2E2" if (not it.fecha_compra_proveedor or it.estado_producto == "PENDIENTE") else "DCFCE7"
+            color_est = "FEE2E2" if (not it.fecha_compra_proveedor or it.estado_producto in ("PENDIENTE", "PENDIENTE DE PAGO")) else "DCFCE7"
             ws[f"L{fila_idx}"].fill = PatternFill("solid", fgColor=color_compra)
             ws[f"W{fila_idx}"].fill = PatternFill("solid", fgColor=color_est)
             for col_m in ("Q", "R", "S", "T", "V"):

@@ -2,88 +2,1410 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fly Logistic S.A.S. | Gestión de Órdenes (OMS)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>{% block title %}Fly Logistic — Centro de Comando Operativo{% endblock %}</title>
+    <link rel="icon" type="image/webp" href="/logo_fly.webp">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .fly-bg { background-color: #002060; }
-        .fly-gradient { background: linear-gradient(135deg, #002060 0%, #001238 100%); }
-        .fly-hover:hover { background-color: #001540; }
-        .fly-text { color: #002060; }
-        [x-cloak] { display: none !important; }
+        :root {
+            --fly-navy: #002060;
+            --fly-navy-dark: #001540;
+            --fly-blue: #1B4F9C;
+            --fly-sky: #5B9BD5;
+            --fly-ice: #EBF3FA;
+            --fly-surface: #F4F7FB;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--fly-surface);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(91, 155, 213, 0.12) 0px, transparent 48%),
+                radial-gradient(at 100% 0%, rgba(0, 32, 96, 0.07) 0px, transparent 48%);
+            background-attachment: fixed;
+            color: #0f172a;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        .font-mono-code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        [x-cloak] {
+            display: none !important;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #eef2f6;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #002060;
+        }
+        .fly-card {
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(203, 213, 225, 0.85);
+            box-shadow: 0 4px 20px -2px rgba(0, 32, 96, 0.06), 0 2px 6px -1px rgba(0, 32, 96, 0.04);
+            border-radius: 1rem;
+        }
+        .fly-header-gradient {
+            background: linear-gradient(135deg, #001848 0%, #002060 55%, #1B4F9C 100%);
+        }
+        .fly-futuristic-border {
+            position: relative;
+        }
+        .fly-futuristic-border::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+        }
+        @keyframes rowFlashSuccess {
+            0% { background-color: rgba(16, 185, 129, 0.28); transform: scale(1.003); }
+            50% { background-color: rgba(56, 189, 248, 0.18); }
+            100% { background-color: transparent; transform: scale(1); }
+        }
+        .tera-row-updated {
+            animation: rowFlashSuccess 1.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
-    {% if user is defined and user %}
-    <header class="fly-bg text-white shadow-md sticky top-0 z-50 border-b border-white/10">
-        <div class="max-w-[1600px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
-            <a href="/pedidos" class="flex items-center gap-3 shrink-0">
-                <div class="bg-white rounded-lg px-2.5 py-1 flex items-center justify-center shadow-sm">
-                    <img src="/logo-empresa" alt="Fly Logistic S.A.S." class="h-7 sm:h-8 w-auto object-contain">
-                </div>
-                <div class="leading-tight">
-                    <span class="font-extrabold text-sm sm:text-base tracking-tight block">FLY LOGISTIC S.A.S.</span>
-                    <span class="text-[10px] text-sky-300 uppercase tracking-widest block font-semibold">Plataforma de Gestión Logística</span>
-                </div>
-            </a>
+<body class="min-h-screen flex flex-col justify-between selection:bg-[#002060] selection:text-white"
+      x-data="relojJornadaApp()"
+      x-init="iniciar()">
 
-            <!-- Navegación superior limpia (Sin botones de Excel ni Nueva Orden duplicados) -->
-            <nav class="hidden xl:flex items-center gap-1.5 text-xs font-semibold">
-                <a href="/pedidos" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Órdenes de Compra</a>
-                {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                <a href="/supervision" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Supervisión de Cartera</a>
-                <a href="/informes" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Indicadores Gerenciales</a>
-                <a href="/gestion_usuarios" class="px-3 py-2 rounded-lg hover:bg-white/10 transition whitespace-nowrap">Gestión de Usuarios</a>
-                {% endif %}
-            </nav>
+    {% if user %}
+    <!-- BARRA DE NAVEGACIÓN CORPORATIVA FLY LOGISTIC -->
+    <header class="fly-header-gradient text-white sticky top-0 z-50 shadow-lg border-b border-[#5B9BD5]/30"
+            x-data="{ menuMovil: false }">
+        <div class="max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between min-h-[4rem] py-2 gap-2 sm:gap-4">
+                <!-- Identidad Corporativa -->
+                <div class="flex items-center gap-3 shrink-0">
+                    <a href="{% if user.rol == 'Almacenista' %}/inventario?warehouse=1{% else %}/pedidos{% endif %}" class="flex items-center gap-3 group focus:outline-none shrink-0">
+                        <div class="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-white p-1 shadow-md flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                            <img src="{{ LOGO_SRC or '/logo_fly.webp' }}" onerror="this.onerror=null; this.src='/logo-empresa';" alt="Fly Logistic" class="max-h-full max-w-full object-contain">
+                        </div>
+                        <div class="leading-tight">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm sm:text-base font-extrabold tracking-tight text-white whitespace-nowrap">FLY LOGISTIC</span>
+                                <span class="hidden sm:inline-block text-[9px] font-extrabold uppercase tracking-widest bg-[#5B9BD5]/25 text-sky-200 px-2 py-0.5 rounded-full border border-sky-300/30 whitespace-nowrap">
+                                    Centro de Comando
+                                </span>
+                            </div>
+                            <span class="hidden md:block text-[10px] sm:text-[11px] font-medium text-sky-200/90 whitespace-nowrap">
+                                {% if user.rol == 'Almacenista' %}Control y Trazabilidad de Bodega Aeronáutica (Warehouses 1, 2 y 3){% else %}Gestión de Órdenes, Cotizaciones y Trazabilidad Aeronáutica{% endif %}
+                            </span>
+                        </div>
+                    </a>
+                </div>
 
-            <div class="hidden sm:flex items-center gap-2.5 shrink-0">
-                <a href="/perfil" class="bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 transition">
-                    <span class="font-semibold truncate max-w-[170px]">{{ user.nombre }}</span>
-                    <span class="bg-sky-400 text-[#002060] px-2 py-0.5 rounded text-[10px] font-extrabold uppercase">{{ user.rol }}</span>
+                <!-- Navegación Escritorio (Con Aislamiento Estricto para Almacenista y Pills Single-Line) -->
+                {% set ruta_actual = (request.url.path if request and request.url and request.url.path is defined else (request.url|string)) %}
+                <nav class="hidden xl:flex items-center gap-1.5 shrink-0">
+                    {% if user.rol == 'Almacenista' %}
+                    <!-- Módulo Exclusivo para Almacenista -->
+                    <a href="/inventario?warehouse=1"
+                       class="whitespace-nowrap px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 bg-white text-[#002060] shadow-sm">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>Inventario</span>
+                    </a>
+                    {% else %}
+                    <!-- Módulos Comerciales y Directivos: Centro de Operaciones, Inventario, Analítica SLA, Supervisión, Usuarios y Perfil -->
+                    <a href="/pedidos"
+                       class="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5 {% if '/pedidos' in ruta_actual and not modo_vista_inventario %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}text-sky-100 hover:bg-white/10 hover:text-white font-bold{% endif %}">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Centro de Operaciones</span>
+                    </a>
+                    <a href="/inventario?warehouse=1"
+                       class="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5 {% if '/inventario' in ruta_actual or modo_vista_inventario %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}text-sky-100 hover:bg-white/10 hover:text-white font-bold{% endif %}">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>Inventario</span>
+                    </a>
+                    <a href="/informes"
+                       class="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5 {% if '/informes' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}text-sky-100 hover:bg-white/10 hover:text-white font-bold{% endif %}">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span>Analítica SLA</span>
+                    </a>
+                    {% if user.rol in ['Jefe de area', 'Gerencia', 'Administrador'] %}
+                    <a href="/supervision"
+                       class="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5 {% if '/supervision' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}text-sky-100 hover:bg-white/10 hover:text-white font-bold{% endif %}">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span>Supervisión</span>
+                    </a>
+                    <a href="/gestion_usuarios"
+                       class="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5 {% if '/gestion_usuarios' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}text-sky-100 hover:bg-white/10 hover:text-white font-bold{% endif %}">
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                        <span>Usuarios</span>
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </nav>
+
+                <!-- Usuario Activo y Controles -->
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div class="hidden md:flex items-center gap-2.5 bg-white/10 border border-white/15 px-3 py-1.5 rounded-xl shrink-0">
+                        <div class="text-right leading-tight shrink-0">
+                            <p class="text-xs font-extrabold text-white truncate max-w-[170px] whitespace-nowrap">{{ user.nombre }}</p>
+                            <p class="text-[10px] font-bold {% if user.rol == 'Almacenista' %}text-emerald-300{% else %}text-sky-200{% endif %} uppercase tracking-wider whitespace-nowrap">{{ user.rol }}</p>
+                        </div>
+                        <a href="/perfil"
+                           class="whitespace-nowrap shrink-0 bg-white/15 hover:bg-white hover:text-[#002060] text-white px-3 py-1.5 rounded-lg text-xs font-extrabold transition shadow-sm"
+                           title="Configurar mi cuenta, contraseña y llaves de horario">
+                            Mi Perfil
+                        </a>
+                        <a href="/logout"
+                           class="whitespace-nowrap shrink-0 bg-rose-500/90 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold transition shadow-sm"
+                           title="Cerrar sesión de forma segura">
+                            Salir
+                        </a>
+                    </div>
+
+                    <!-- Botón Menú Móvil y Tablet -->
+                    <button type="button"
+                            @click="menuMovil = !menuMovil"
+                            class="xl:hidden inline-flex items-center justify-center px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-extrabold text-white focus:outline-none whitespace-nowrap shrink-0">
+                        <span x-text="menuMovil ? 'Cerrar Menú' : 'Menú Principal'">Menú Principal</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menú Desplegable Adaptable para Móviles y Tablets -->
+        <div x-show="menuMovil" x-cloak x-transition
+             class="xl:hidden bg-[#001540] border-t border-white/15 px-4 pt-3 pb-4 space-y-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {% if user.rol == 'Almacenista' %}
+                <a href="/inventario?warehouse=1" class="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white text-[#002060] shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span>Inventario</span>
                 </a>
-                <a href="/logout" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition">Cerrar Sesión</a>
+                {% else %}
+                <a href="/pedidos" class="px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 {% if '/pedidos' in ruta_actual and not modo_vista_inventario %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}bg-white/10 text-white hover:bg-white/20 font-bold{% endif %}">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    <span>Centro de Operaciones</span>
+                </a>
+                <a href="/inventario?warehouse=1" class="px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 {% if '/inventario' in ruta_actual or modo_vista_inventario %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}bg-white/10 text-white hover:bg-white/20 font-bold{% endif %}">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span>Inventario</span>
+                </a>
+                <a href="/informes" class="px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 {% if '/informes' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}bg-white/10 text-white hover:bg-white/20 font-bold{% endif %}">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    <span>Analítica SLA</span>
+                </a>
+                {% if user.rol in ['Jefe de area', 'Gerencia', 'Administrador'] %}
+                <a href="/supervision" class="px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 {% if '/supervision' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}bg-white/10 text-white hover:bg-white/20 font-bold{% endif %}">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <span>Supervisión</span>
+                </a>
+                <a href="/gestion_usuarios" class="px-3.5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 {% if '/gestion_usuarios' in ruta_actual %}bg-white text-[#002060] shadow-sm font-extrabold{% else %}bg-white/10 text-white hover:bg-white/20 font-bold{% endif %}">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <span>Usuarios</span>
+                </a>
+                {% endif %}
+                {% endif %}
             </div>
-
-            <button type="button" onclick="document.getElementById('menu-movil').classList.toggle('hidden')" class="xl:hidden bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white focus:outline-none" aria-label="Menú">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-            </button>
+            <div class="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                <div class="text-xs text-sky-200">
+                    Sesión activa: <strong class="text-white">{{ user.nombre }}</strong> ({{ user.rol }})
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/perfil" class="bg-white/15 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Mi Perfil</a>
+                    <a href="/logout" class="bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Cerrar Sesión</a>
+                </div>
+            </div>
         </div>
 
-        <div id="menu-movil" class="hidden xl:hidden px-4 pt-2 pb-4 border-t border-white/10 space-y-1.5 text-xs font-semibold bg-[#001848]">
-            <div class="flex items-center justify-between bg-white/10 px-3 py-2 rounded-lg mb-2 sm:hidden">
-                <a href="/perfil" class="truncate font-bold text-white">{{ user.nombre }}</a>
-                <span class="bg-sky-400 text-[#002060] px-2 py-0.5 rounded text-[10px] font-extrabold uppercase">{{ user.rol }}</span>
+        <!-- Barra Informativa de Horario Oficial de Bogotá -->
+        {% set eh = (estado_horario(user) if user is defined and user else estado_horario_actual) %}
+        {% if eh %}
+        <div class="bg-[#001235] border-t border-white/10 text-[11px] text-sky-100/90">
+            <div class="max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-1.5 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <span class="font-bold text-sky-200 whitespace-nowrap">
+                        Hora oficial Bogotá:
+                        <strong class="font-mono-code text-white" x-text="horaBogotaVivo || '{{ eh.hora_actual }}'">{{ eh.hora_actual }}</strong>
+                    </span>
+                    <span class="hidden sm:inline text-white/30">|</span>
+                    <span class="text-slate-300">{{ eh.regla_texto }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <template x-if="cierreOperativo">
+                        <span class="bg-white/10 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-sky-200 whitespace-nowrap">
+                            <span x-text="estadoJornada"></span>:
+                            <strong class="font-mono-code text-white ml-1" x-text="cierreOperativo"></strong>
+                        </span>
+                    </template>
+                    {% if eh.aplica and not eh.permitido %}
+                    <button type="button"
+                            @click="modalDesbloqueoHorario = true"
+                            class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold px-3 py-0.5 rounded-lg text-[10px] transition shadow-sm whitespace-nowrap">
+                        Ingresar contraseña de autorización extra-horario
+                    </button>
+                    {% elif eh.desbloqueado %}
+                    <span class="bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold whitespace-nowrap">
+                        Autorización especial activa hasta las {{ eh.hasta }}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
-            <a href="/pedidos" class="block px-3 py-2 rounded-lg hover:bg-white/10">Órdenes de Compra</a>
-            <a href="/pedidos/nuevo" class="block px-3 py-2 rounded-lg hover:bg-white/10">Registrar Nueva Orden</a>
-            {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-            <a href="/supervision" class="block px-3 py-2 rounded-lg hover:bg-white/10">Supervisión de Cartera</a>
-            <a href="/informes" class="block px-3 py-2 rounded-lg hover:bg-white/10">Indicadores Gerenciales</a>
-            <a href="/gestion_usuarios" class="block px-3 py-2 rounded-lg hover:bg-white/10">Gestión de Usuarios</a>
-            {% endif %}
-            <div class="pt-2 flex gap-2 sm:hidden">
-                <a href="/perfil" class="flex-1 text-center bg-white/15 py-2 rounded-lg">Mi Perfil</a>
-                <a href="/logout" class="flex-1 text-center bg-red-600 py-2 rounded-lg text-white font-bold">Cerrar Sesión</a>
-            </div>
-        </div>
-    </header>
-    {% endif %}
-
-    <main class="flex-grow max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        {% if flash %}
-        <div class="mb-4 px-4 py-3 rounded-xl text-xs sm:text-sm font-semibold shadow-sm border {% if flash.ok %}bg-emerald-50 border-emerald-300 text-emerald-800{% else %}bg-red-50 border-red-300 text-red-700{% endif %}">
-            {{ flash.msg }}
         </div>
         {% endif %}
-        {% block content %}{% endblock %}
+    </header>
+
+    <!-- MODAL PARA DESBLOQUEAR HORARIO EXTRAORDINARIO -->
+    <div x-show="modalDesbloqueoHorario" x-cloak
+         class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+         @keydown.escape.window="modalDesbloqueoHorario = false">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden"
+             @click.outside="modalDesbloqueoHorario = false">
+            <div class="bg-[#002060] text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-300">Control de Jornada Laboral</p>
+                    <h3 class="text-base font-extrabold">Habilitar trabajo fuera de horario</h3>
+                </div>
+                <button type="button" @click="modalDesbloqueoHorario = false" class="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg">
+                    Cerrar
+                </button>
+            </div>
+            <form method="post" action="/horario/desbloquear" class="p-6 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Tu jornada habitual ha finalizado. Para registrar o editar información en este momento, solicita a tu Jefe de Área, Gerencia o Administración una contraseña maestra temporal (formato FLY-XXXX-XXXX) y escríbela a continuación:
+                </p>
+                <input type="hidden" name="next" value="{{ request.url.path if request and request.url and request.url.path is defined else '/pedidos' }}">
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-700 mb-1">
+                        Contraseña maestra temporal (FLY-XXXX-XXXX)
+                    </label>
+                    <input type="text" name="clave_horario" required
+                           placeholder="Ej. FLY-4K9M-7P2Q"
+                           class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-mono-code font-bold uppercase focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="modalDesbloqueoHorario = false"
+                            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-5 py-2 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs font-extrabold shadow-md">
+                        Validar y Habilitar Acceso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- CONTENEDOR PRINCIPAL ADAPTABLE A CUALQUIER PANTALLA -->
+    <main class="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        {% if flash %}
+        <div x-data="{ visible: true }" x-show="visible" x-transition
+             class="mb-5 rounded-2xl border px-4 py-3.5 shadow-sm flex items-center justify-between gap-3 {% if flash.ok %}bg-emerald-50 border-emerald-300 text-emerald-950{% else %}bg-rose-50 border-rose-300 text-rose-950{% endif %}">
+            <div class="flex items-center gap-3 text-xs sm:text-sm font-bold leading-snug">
+                <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider shrink-0 {% if flash.ok %}bg-emerald-600 text-white{% else %}bg-rose-600 text-white{% endif %}">
+                    {% if flash.ok %}Confirmación{% else %}Atención{% endif %}
+                </span>
+                <span>{{ flash.msg }}</span>
+            </div>
+            <button type="button" @click="visible = false"
+                    class="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-black/5 hover:bg-black/10 shrink-0">
+                Entendido
+            </button>
+        </div>
+        {% endif %}
+
+        {% if modo_vista_inventario %}
+        <!-- ========================================================================= -->
+        <!-- CONTROLADOR JAVASCRIPT INVENTARIO Y PISTOLA TERA HW0009                   -->
+        <!-- ========================================================================= -->
+        <script>
+        const ITEMS_INV_LIST = {{ (items_inventario_json or '[]') | safe }};
+        const ITEMS_INV_MAP = {};
+        ITEMS_INV_LIST.forEach((x) => { ITEMS_INV_MAP[x.id] = x; });
+
+        function controlInventarioAeronautico() {
+            return {
+                warehouseActivo: '{{ warehouse_activo if warehouse_activo in ["1", "2", "3"] else "1" }}',
+                modoPistola: 'SALIDA',
+                codigoPistola: '',
+                poPistola: '',
+                procesandoEscaneo: false,
+                escuchaSilenciosaActiva: true,
+                ultimoEscaneo: null,
+                alertaRestrictiva: null,
+                modalItem: false,
+                modalDespacho: false,
+                bufferTeraHW0009: '',
+                ultimoTiempoTeclaTera: 0,
+                TemporizadorLimpiezaTera: null,
+                formItem: {
+                    item_id: '',
+                    warehouse: '{{ warehouse_activo if warehouse_activo in ["1", "2", "3"] else "1" }}',
+                    codigo_barras: '',
+                    parte_numero: '',
+                    descripcion: '',
+                    medida: 'UND',
+                    marca: '',
+                    normativa: 'MIL-SPEC / HAZMAT',
+                    lote: '',
+                    dom: '',
+                    doe: '',
+                    existencia: 1,
+                    ubicacion: ''
+                },
+                formDespacho: {
+                    item_id: '',
+                    warehouse: '{{ warehouse_activo if warehouse_activo in ["1", "2", "3"] else "1" }}',
+                    parte_numero: '',
+                    descripcion: '',
+                    disponible: 0,
+                    medida: 'UND',
+                    po_numero: '',
+                    cantidad: 1
+                },
+                iniciarModulo() {
+                    this.iniciarEscuchaSilenciosaTeraHW0009();
+                    this.$nextTick(() => {
+                        if (this.$refs.inputScanner && !this.modalItem && !this.modalDespacho) {
+                            this.$refs.inputScanner.focus();
+                        }
+                    });
+                },
+                iniciarEscuchaSilenciosaTeraHW0009() {
+                    window.addEventListener('keydown', (ev) => {
+                        if (this.modalItem || this.modalDespacho) {
+                            return;
+                        }
+                        const elActivo = document.activeElement;
+                        const esInputScanner = (elActivo === this.$refs.inputScanner);
+                        const tag = elActivo ? (elActivo.tagName || '').toUpperCase() : '';
+                        const escribiendoEnOtroCampo = !esInputScanner && (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+
+                        if (escribiendoEnOtroCampo) {
+                            return;
+                        }
+
+                        const ahora = performance.now();
+                        const deltaMs = ahora - this.ultimoTiempoTeclaTera;
+
+                        if (ev.key === 'Enter' || ev.code === 'NumpadEnter') {
+                            if (!esInputScanner && this.bufferTeraHW0009.trim().length >= 2) {
+                                ev.preventDefault();
+                                const codigoCapturado = this.bufferTeraHW0009.trim();
+                                this.bufferTeraHW0009 = '';
+                                this.codigoPistola = codigoCapturado;
+                                this.procesarEscaneoPistola(codigoCapturado);
+                            }
+                            return;
+                        }
+
+                        if (ev.key && ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+                            if (!esInputScanner) {
+                                if (deltaMs > 95) {
+                                    this.bufferTeraHW0009 = '';
+                                }
+                                this.bufferTeraHW0009 += ev.key;
+                                this.ultimoTiempoTeclaTera = ahora;
+                                if (this.TemporizadorLimpiezaTera) {
+                                    clearTimeout(this.TemporizadorLimpiezaTera);
+                                }
+                                this.TemporizadorLimpiezaTera = setTimeout(() => {
+                                    this.bufferTeraHW0009 = '';
+                                }, 280);
+                            }
+                        }
+                    });
+                },
+                enfocarPistola() {
+                    this.$nextTick(() => {
+                        if (this.$refs.inputScanner) {
+                            this.$refs.inputScanner.focus();
+                            this.$refs.inputScanner.select();
+                        }
+                    });
+                },
+                emitirSonido(esError) {
+                    try {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioCtx) return;
+                        const ctx = new AudioCtx();
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        if (esError) {
+                            osc.type = 'sawtooth';
+                            osc.frequency.setValueAtTime(220, ctx.currentTime);
+                            osc.frequency.setValueAtTime(165, ctx.currentTime + 0.14);
+                            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 0.32);
+                        } else {
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(880, ctx.currentTime);
+                            osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.06);
+                            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 0.14);
+                        }
+                    } catch (e) {}
+                },
+                actualizarTablaInventarioSinRecargar(data) {
+                    if (!data || !data.item) return;
+                    const it = data.item;
+                    ITEMS_INV_MAP[it.id] = it;
+
+                    document.querySelectorAll(`[data-inv-stock="${it.id}"]`).forEach((el) => {
+                        el.textContent = String(it.existencia);
+                    });
+                    document.querySelectorAll(`[data-inv-updated-by="${it.id}"]`).forEach((el) => {
+                        el.textContent = 'Por: ' + (it.actualizado_por || 'Sistema');
+                    });
+                    document.querySelectorAll(`[data-inv-row-id="${it.id}"], [data-inv-card-id="${it.id}"]`).forEach((fila) => {
+                        fila.classList.remove('tera-row-updated');
+                        void fila.offsetWidth;
+                        fila.classList.add('tera-row-updated');
+                    });
+
+                    if (data.resumen_warehouses) {
+                        Object.keys(data.resumen_warehouses).forEach((wid) => {
+                            const rw = data.resumen_warehouses[wid];
+                            const elTotal = document.querySelector(`[data-kpi-w-total="${wid}"]`);
+                            const elSkus = document.querySelector(`[data-kpi-w-skus="${wid}"]`);
+                            const elVig = document.querySelector(`[data-kpi-w-vigentes="${wid}"]`);
+                            const elCrit = document.querySelector(`[data-kpi-w-criticos="${wid}"]`);
+                            const elVenc = document.querySelector(`[data-kpi-w-vencidos="${wid}"]`);
+                            if (elTotal) elTotal.textContent = String(rw.existencia_total);
+                            if (elSkus) elSkus.textContent = String(rw.skus);
+                            if (elVig) elVig.textContent = String(rw.vigentes);
+                            if (elCrit) elCrit.textContent = String(rw.criticos);
+                            if (elVenc) elVenc.textContent = String(rw.vencidos);
+                        });
+                    }
+
+                    if (data.movimiento) {
+                        const mv = data.movimiento;
+                        const tbody = document.getElementById('tbody-bitacora-movimientos');
+                        if (tbody) {
+                            const filaVacia = document.getElementById('fila-sin-movimientos');
+                            if (filaVacia) filaVacia.remove();
+                            const tr = document.createElement('tr');
+                            tr.className = 'tera-row-updated hover:bg-slate-50';
+                            const esPositivo = Number(mv.cantidad_movimiento) >= 0;
+                            const badgeClass = esPositivo ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900';
+                            const deltaClass = esPositivo ? 'text-emerald-700' : 'text-rose-700';
+                            const deltaTxt = Number(mv.cantidad_movimiento) > 0 ? `+${mv.cantidad_movimiento}` : `${mv.cantidad_movimiento}`;
+                            tr.innerHTML = `
+                                <td class="py-2.5 px-3.5 font-mono-code text-[11px] text-slate-600">${mv.fecha_hora_bogota || ''}</td>
+                                <td class="py-2.5 px-3.5 font-bold text-[#002060]">Warehouse ${mv.warehouse}</td>
+                                <td class="py-2.5 px-3.5"><span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${badgeClass}">${mv.tipo_movimiento}</span></td>
+                                <td class="py-2.5 px-3.5 font-bold text-slate-800">${mv.parte_numero} <span class="text-slate-400 font-mono-code">(${mv.codigo_barras})</span></td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code">${mv.cantidad_anterior}</td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code font-extrabold ${deltaClass}">${deltaTxt}</td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code font-extrabold text-[#002060]">${mv.cantidad_nueva}</td>
+                                <td class="py-2.5 px-3.5 text-[11px] text-slate-600">${mv.po_asociada || mv.observacion || ''}</td>
+                                <td class="py-2.5 px-3.5 font-semibold text-slate-700">${mv.usuario_nombre || ''}</td>
+                            `;
+                            tbody.prepend(tr);
+                        }
+                    }
+                },
+                async procesarEscaneoPistola(codigoForzado = null) {
+                    const codigo = String(codigoForzado !== null ? codigoForzado : (this.codigoPistola || '')).trim();
+                    if (!codigo || this.procesandoEscaneo) return;
+                    this.procesandoEscaneo = true;
+                    this.alertaRestrictiva = null;
+                    try {
+                        const resp = await fetch('/api/inventario/escanear', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                codigo_barras: codigo,
+                                warehouse: this.warehouseActivo,
+                                modo: this.modoPistola,
+                                po_asociada: this.poPistola,
+                                dispositivo: 'Tera HW0009'
+                            })
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok || !data.ok) {
+                            this.emitirSonido(true);
+                            this.alertaRestrictiva = {
+                                titulo: data.titulo || 'Alerta de Control de Bodega',
+                                msg: data.msg || 'No fue posible procesar el código escaneado.'
+                            };
+                            this.codigoPistola = '';
+                            this.enfocarPistola();
+                        } else {
+                            this.emitirSonido(false);
+                            this.ultimoEscaneo = data;
+                            this.codigoPistola = '';
+                            this.actualizarTablaInventarioSinRecargar(data);
+                            this.enfocarPistola();
+                        }
+                    } catch (err) {
+                        this.emitirSonido(true);
+                        this.alertaRestrictiva = {
+                            titulo: 'Error de comunicación con el servidor',
+                            msg: 'Verifica tu conexión local e intenta escanear el código nuevamente.'
+                        };
+                    } finally {
+                        this.procesandoEscaneo = false;
+                    }
+                },
+                abrirModalNuevo() {
+                    this.formItem = {
+                        item_id: '',
+                        warehouse: this.warehouseActivo in {'1':1, '2':1, '3':1} ? this.warehouseActivo : '1',
+                        codigo_barras: '',
+                        parte_numero: '',
+                        descripcion: '',
+                        medida: 'UND',
+                        marca: '',
+                        normativa: 'MIL-SPEC / HAZMAT',
+                        lote: '',
+                        dom: '',
+                        doe: '',
+                        existencia: 1,
+                        ubicacion: ''
+                    };
+                    this.modalItem = true;
+                },
+                abrirModalEditar(id) {
+                    const it = ITEMS_INV_MAP[id];
+                    if (!it) return;
+                    this.formItem = {
+                        item_id: it.id,
+                        warehouse: String(it.warehouse || 1),
+                        codigo_barras: it.codigo_barras || '',
+                        parte_numero: it.parte_numero || '',
+                        descripcion: it.descripcion || '',
+                        medida: it.medida || 'UND',
+                        marca: it.marca || '',
+                        normativa: it.normativa || 'MIL-SPEC / HAZMAT',
+                        lote: it.lote || '',
+                        dom: it.dom || '',
+                        doe: it.doe || '',
+                        existencia: it.existencia || 0,
+                        ubicacion: it.ubicacion || ''
+                    };
+                    this.modalItem = true;
+                },
+                abrirModalDespacho(id) {
+                    const it = ITEMS_INV_MAP[id];
+                    if (!it) return;
+                    this.formDespacho = {
+                        item_id: it.id,
+                        warehouse: String(it.warehouse || 1),
+                        parte_numero: it.parte_numero || '',
+                        descripcion: it.descripcion || '',
+                        disponible: Number(it.existencia || 0),
+                        medida: it.medida || 'UND',
+                        po_numero: this.poPistola || '',
+                        cantidad: 1
+                    };
+                    this.modalDespacho = true;
+                }
+            };
+        }
+        window.controlInventarioAeronautico = controlInventarioAeronautico;
+        document.addEventListener('alpine:init', () => {
+            if (window.Alpine) {
+                window.Alpine.data('controlInventarioAeronautico', controlInventarioAeronautico);
+            }
+        });
+        </script>
+        <!-- ========================================================================= -->
+        <!-- MÓDULO DE INVENTARIO Y TRAZABILIDAD AERONÁUTICA + PISTOLA TERA HW0009     -->
+        <!-- ========================================================================= -->
+        <div x-data="controlInventarioAeronautico()" x-init="iniciarModulo()" class="space-y-5">
+
+            <!-- ENCABEZADO DEL CENTRO DE INVENTARIO Y EXPORTACIÓN DE EXCEL COMPLETA -->
+            <div class="fly-card p-4 sm:p-6">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#002060] text-white">
+                                Control de Existencias en Tiempo Real
+                            </span>
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                Pistola Lectora Tera HW0009 Integrada
+                            </span>
+                        </div>
+                        <h1 class="text-lg sm:text-2xl font-extrabold text-[#002060]">
+                            Bodega e Inventario Aeronáutico
+                        </h1>
+                        <p class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                            Consulta tus repuestos por bodega, verifica fechas de vencimiento (DOE) y usa la pistola lectora Tera HW0009 para sumar o descontar unidades al instante sin recargar la pantalla.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button type="button"
+                                @click="abrirModalNuevo()"
+                                class="bg-[#002060] hover:bg-[#001540] text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-sm transition">
+                            + Registrar Nuevo Repuesto en Bodega
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SELECTOR DE BODEGAS (WAREHOUSE 1, 2, 3 Y VISTA MAESTRA) CON CONTADORES EN VIVO -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
+                    {% for wid in [1, 2, 3] %}
+                    {% set rw = resumen_warehouses.get(wid, {}) %}
+                    <a href="/inventario?warehouse={{ wid }}"
+                       class="p-3.5 rounded-2xl border-2 transition flex flex-col justify-between {% if warehouse_activo == (wid|string) %}bg-[#002060] text-white border-[#002060] shadow-md{% else %}bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200 hover:border-[#5B9BD5]{% endif %}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider {% if warehouse_activo == (wid|string) %}text-sky-200{% else %}text-[#002060]{% endif %}">
+                                Bodega {{ wid }} (Warehouse {{ wid }})
+                            </span>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full {% if warehouse_activo == (wid|string) %}bg-emerald-400 text-slate-950{% else %}bg-slate-200 text-slate-700{% endif %}">
+                                <span data-kpi-w-skus="{{ wid }}">{{ rw.get('skus', 0) }}</span> referencias
+                            </span>
+                        </div>
+                        <div class="mt-2 flex items-baseline justify-between">
+                            <div>
+                                <span class="text-2xl font-extrabold font-mono-code" data-kpi-w-total="{{ wid }}">{{ rw.get('existencia_total', 0) }}</span>
+                                <span class="text-[11px] font-semibold {% if warehouse_activo == (wid|string) %}text-sky-200{% else %}text-slate-500{% endif %}">unidades disponibles</span>
+                            </div>
+                        </div>
+                        <div class="mt-2.5 pt-2 border-t {% if warehouse_activo == (wid|string) %}border-white/15{% else %}border-slate-200{% endif %} flex items-center justify-between text-[10px] font-bold">
+                            <span class="{% if warehouse_activo == (wid|string) %}text-emerald-300{% else %}text-emerald-700{% endif %}">
+                                Vigentes: <strong data-kpi-w-vigentes="{{ wid }}">{{ rw.get('vigentes', 0) }}</strong>
+                            </span>
+                            <span class="{% if warehouse_activo == (wid|string) %}text-amber-300{% else %}text-amber-700{% endif %}">
+                                Por vencer: <strong data-kpi-w-criticos="{{ wid }}">{{ rw.get('criticos', 0) }}</strong>
+                            </span>
+                            <span class="{% if warehouse_activo == (wid|string) %}text-rose-300{% else %}text-rose-700{% endif %}">
+                                Vencidos: <strong data-kpi-w-vencidos="{{ wid }}">{{ rw.get('vencidos', 0) }}</strong>
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+
+                    <a href="/inventario?warehouse=maestra"
+                       class="p-3.5 rounded-2xl border-2 transition flex flex-col justify-between {% if warehouse_activo == 'maestra' %}bg-[#002060] text-white border-[#002060] shadow-md{% else %}bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200 hover:border-[#5B9BD5]{% endif %}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider {% if warehouse_activo == 'maestra' %}text-sky-200{% else %}text-[#002060]{% endif %}">
+                                Vista Maestra Consolidada
+                            </span>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full {% if warehouse_activo == 'maestra' %}bg-sky-400 text-slate-950{% else %}bg-blue-100 text-[#002060]{% endif %}">
+                                3 Bodegas Unidas
+                            </span>
+                        </div>
+                        <div class="mt-2">
+                            <p class="text-xs font-bold {% if warehouse_activo == 'maestra' %}text-white{% else %}text-slate-700{% endif %}">
+                                Consulta simultánea de todas las sedes
+                            </p>
+                            <p class="text-[11px] mt-1 {% if warehouse_activo == 'maestra' %}text-sky-200{% else %}text-slate-500{% endif %}">
+                                Ideal para comparar existencias entre Warehouse 1, 2 y 3 en una sola tabla.
+                            </p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- TERMINAL LÁSER TERA HW0009: CAPTURA SILENCIOSA EN MILISEGUNDOS SIN RECARGAR PÁGINA -->
+            <div class="fly-card border-2 border-[#002060]/20 p-5 bg-gradient-to-r from-[#002060]/[0.03] via-white to-emerald-50/40 space-y-4">
+                
+                <!-- Encabezado de la Terminal con Estados y Guía -->
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                    <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#002060] text-white shadow-xs">
+                                <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Terminal Hardware Tera HW0009 Activa
+                            </span>
+                            <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                  x-text="escuchaSilenciosaActiva ? 'Escucha silenciosa lista: dispara en cualquier momento' : 'Modo lectura manual'">
+                                Escucha silenciosa lista: dispara en cualquier momento
+                            </span>
+                        </div>
+                        <h2 class="text-base sm:text-lg font-extrabold text-[#002060]">
+                            Lectura Automática de Códigos de Barras (Pistola Tera HW0009)
+                        </h2>
+                    </div>
+                    <div class="text-xs text-slate-500 max-w-md text-left lg:text-right">
+                        Apunta el lector al código de barras del repuesto. El sistema captura la ráfaga ultrarrápida del láser, descuenta o suma la unidad y actualiza la tabla en vivo.
+                    </div>
+                </div>
+
+                <!-- Formulario de Escaneo con Dimensiones Amplias y Nunca Comprimidas -->
+                <form @submit.prevent="procesarEscaneoPistola()" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    
+                    <!-- 1. Operación -->
+                    <div class="md:col-span-3">
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                            1. Acción al escanear
+                        </label>
+                        <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button type="button"
+                                    @click="modoPistola = 'SALIDA'; enfocarPistola()"
+                                    class="py-2.5 px-3 rounded-lg text-xs font-extrabold transition text-center"
+                                    :class="modoPistola === 'SALIDA' ? 'bg-amber-500 text-slate-950 shadow-sm ring-2 ring-amber-300' : 'text-slate-600 hover:text-slate-900 bg-transparent'">
+                                Salida (-1)
+                            </button>
+                            <button type="button"
+                                    @click="modoPistola = 'ENTRADA'; enfocarPistola()"
+                                    class="py-2.5 px-3 rounded-lg text-xs font-extrabold transition text-center"
+                                    :class="modoPistola === 'ENTRADA' ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300' : 'text-slate-600 hover:text-slate-900 bg-transparent'">
+                                Entrada (+1)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Orden PO (Opcional) -->
+                    <div class="md:col-span-3">
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                            2. Orden PO (Opcional)
+                        </label>
+                        <input type="text"
+                               x-model="poPistola"
+                               list="lista-pos-activas"
+                               placeholder="Ej. PO-2026-001..."
+                               class="w-full h-11 px-3.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-[#002060] focus:outline-none bg-white">
+                        <datalist id="lista-pos-activas">
+                            {% for po_act in pos_activas %}
+                            <option value="{{ po_act.po_codigo }}">{{ po_act.cliente.nombre if po_act.cliente else '' }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+
+                    <!-- 3. Entrada de Código de Barras o Part Number -->
+                    <div class="md:col-span-4">
+                        <label class="block text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                            3. Código de barras o Part Number (Bodega {{ warehouse_activo if warehouse_activo in ['1','2','3'] else '1' }})
+                        </label>
+                        <div class="relative">
+                            <input type="text"
+                                   x-ref="inputScanner"
+                                   x-model="codigoPistola"
+                                   autocomplete="off"
+                                   placeholder="Dispara con la pistola Tera HW0009 o escribe aquí..."
+                                   class="w-full h-11 px-4 pr-16 rounded-xl border-2 border-[#002060] text-sm font-mono-code font-extrabold text-[#002060] bg-white focus:ring-2 focus:ring-sky-400 focus:outline-none placeholder:text-slate-400 placeholder:text-xs">
+                            <button type="button"
+                                    x-show="codigoPistola"
+                                    @click="codigoPistola = ''; enfocarPistola()"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-600 font-bold text-xs"
+                                    title="Limpiar campo">
+                                Limpiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4. Botón Aplicar Lectura (Espacioso, Texto Siempre Visible, NUNCA Comprimido) -->
+                    <div class="md:col-span-2">
+                        <button type="submit"
+                                :disabled="procesandoEscaneo"
+                                class="w-full h-11 px-4 rounded-xl bg-[#002060] hover:bg-[#001540] disabled:opacity-50 text-white text-xs font-extrabold shadow-md transition flex items-center justify-center gap-2 whitespace-nowrap min-w-[140px] cursor-pointer">
+                            <span x-text="procesandoEscaneo ? 'Procesando...' : 'Aplicar Lectura'">Aplicar Lectura</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Atajos de Códigos de Prueba Rápidos para la Bodega Activa -->
+                <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+                    <span class="font-extrabold text-[#002060]">Referencias de prueba en esta bodega:</span>
+                    {% set items_bodega_actual = [] %}
+                    {% for it in todos_items_inventario %}
+                        {% if (warehouse_activo == 'maestra') or (it.warehouse|string == warehouse_activo) %}
+                            {% if items_bodega_actual|length < 5 %}
+                                {% set _ = items_bodega_actual.append(it) %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% for it in items_bodega_actual %}
+                    <button type="button"
+                            @click="codigoPistola = '{{ it.codigo_barras }}'; enfocarPistola()"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-100 text-slate-800 hover:text-[#002060] font-mono-code font-bold border border-slate-200 transition text-[10px]"
+                            title="Haz clic para cargar este código de barras">
+                        {{ it.parte_numero }} <span class="text-slate-400">({{ it.codigo_barras }})</span>
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <!-- Notificación Instantánea de Lectura Exitosa -->
+                <div x-show="ultimoEscaneo" x-cloak x-transition
+                     class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold uppercase">
+                            Lectura Tera HW0009 Aplicada
+                        </span>
+                        <span x-text="ultimoEscaneo ? ultimoEscaneo.msg : ''"></span>
+                    </div>
+                    <button type="button" @click="ultimoEscaneo = null" class="text-[11px] font-extrabold text-emerald-800 hover:underline">
+                        Ocultar aviso
+                    </button>
+                </div>
+
+                <!-- Alerta Restrictiva de Seguridad Aeronáutica (Otra Bodega, Lote Vencido o Stock Cero) -->
+                <div x-show="alertaRestrictiva" x-cloak x-transition
+                     class="mt-3 p-4 rounded-xl bg-rose-50 border-2 border-rose-400 text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-extrabold uppercase">
+                                Bloqueo de Seguridad en Bodega
+                            </span>
+                            <strong class="text-xs sm:text-sm font-extrabold" x-text="alertaRestrictiva ? alertaRestrictiva.titulo : ''"></strong>
+                        </div>
+                        <p class="text-xs text-rose-900 font-medium" x-text="alertaRestrictiva ? alertaRestrictiva.msg : ''"></p>
+                    </div>
+                    <button type="button"
+                            @click="alertaRestrictiva = null; enfocarPistola()"
+                            class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold shrink-0">
+                        Entendido, continuar
+                    </button>
+                </div>
+            </div>
+
+            <!-- BUSCADOR Y FILTROS DE BODEGA -->
+            <div class="fly-card p-4">
+                <form method="get" action="/inventario" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <input type="hidden" name="warehouse" value="{{ warehouse_activo }}">
+                    <div class="sm:col-span-6">
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">
+                            Buscar repuesto por Código de Barras, Part Number, Descripción, Lote o Ubicación
+                        </label>
+                        <input type="text" name="q" value="{{ q_inv }}"
+                               placeholder="Escribe el Part Number, código de barras, marca o ubicación en estantería..."
+                               class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="block text-[10px] font-extrabold uppercase text-slate-600 mb-1">
+                            Estado de Vigencia (Semáforo DOE)
+                        </label>
+                        <select name="convencion"
+                                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-[#002060] focus:outline-none">
+                            <option value="">Todos los estados de vigencia</option>
+                            <option value="VIGENTE" {% if convencion_f == 'VIGENTE' %}selected{% endif %}>Vigente (Óptimo para despacho)</option>
+                            <option value="CRÍTICO" {% if convencion_f == 'CRÍTICO' %}selected{% endif %}>Próximo a vencer (Menos de 90 días)</option>
+                            <option value="VENCIDO" {% if convencion_f == 'VENCIDO' %}selected{% endif %}>Vencido (Bloqueado por calidad)</option>
+                            <option value="SIN FECHA" {% if convencion_f == 'SIN FECHA' %}selected{% endif %}>Sin fecha de vencimiento (No perecedero)</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-3 flex items-center gap-2">
+                        <button type="submit"
+                                class="flex-1 bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-2 px-4 rounded-xl text-xs transition">
+                            Filtrar Inventario
+                        </button>
+                        <a href="/inventario?warehouse={{ warehouse_activo }}"
+                           class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3.5 rounded-xl text-xs transition">
+                            Limpiar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TABLA DE EXISTENCIAS EN BODEGA (ACTUALIZACIÓN REACTIVA EN VIVO) -->
+            <div class="fly-card overflow-hidden">
+                <div class="px-4 sm:px-6 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 rounded-full bg-[#002060]"></span>
+                        <h3 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#002060]">
+                            {% if warehouse_activo == 'maestra' %}
+                                Inventario Maestro Consolidado (Warehouses 1, 2 y 3)
+                            {% else %}
+                                Existencias Registradas en Bodega {{ warehouse_activo }} (Warehouse {{ warehouse_activo }})
+                            {% endif %}
+                        </h3>
+                        <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 text-[#002060]">
+                            {{ total_items }} registros
+                        </span>
+                    </div>
+                    <span class="text-[11px] text-slate-500 font-medium">
+                        Página {{ pagina_actual }} de {{ total_paginas }}
+                    </span>
+                </div>
+
+                <!-- Vista en Tarjetas para Móviles -->
+                <div class="md:hidden divide-y divide-slate-200">
+                    {% for it in items_inventario %}
+                    {% set info = it.convencion_info %}
+                    <div class="p-4 space-y-2.5 transition" data-inv-card-id="{{ it.id }}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-[#002060] text-white">
+                                    Warehouse {{ it.warehouse }}
+                                </span>
+                                <p class="text-sm font-extrabold text-slate-900 mt-1">{{ it.parte_numero }}</p>
+                                <p class="text-xs text-slate-600">{{ it.descripcion }}</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-extrabold font-mono-code text-[#002060]" data-inv-stock="{{ it.id }}">{{ it.existencia }}</span>
+                                <span class="block text-[10px] font-bold text-slate-500">{{ it.medida or 'UND' }}</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[9px] uppercase">Código de Barras</span>
+                                <span class="font-mono-code font-bold text-slate-800">{{ it.codigo_barras }}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[9px] uppercase">Lote / Ubicación</span>
+                                <span class="font-bold text-slate-800">{{ it.lote or 'S/L' }} | {{ it.ubicacion or 'General' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[9px] uppercase">Vencimiento (DOE)</span>
+                                <span class="font-bold text-slate-800">{{ it.doe.isoformat() if it.doe else 'No vence' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-bold block text-[9px] uppercase">Estado Vigencia</span>
+                                <span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold {% if info.color == 'rose' %}bg-rose-100 text-rose-800{% elif info.color == 'amber' %}bg-amber-100 text-amber-800{% elif info.color == 'emerald' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-700{% endif %}">
+                                    {{ info.convencion }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center justify-end gap-1.5 pt-1">
+                            <button type="button" @click="abrirModalEditar({{ it.id }})"
+                                    class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold">
+                                Editar
+                            </button>
+                            <button type="button" @click="abrirModalDespacho({{ it.id }})"
+                                    class="px-2.5 py-1 rounded-lg bg-[#002060] text-white text-[11px] font-bold">
+                                Despachar a PO
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-8 text-center text-xs text-slate-500">
+                        No se encontraron repuestos registrados con los filtros seleccionados.
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Tabla Completa para Escritorio y Laptops -->
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-[#002060] text-white text-[10px] font-extrabold uppercase tracking-wider">
+                                <th class="py-3 px-3.5">Bodega</th>
+                                <th class="py-3 px-3.5">Código de Barras</th>
+                                <th class="py-3 px-3.5">Part Number y Descripción</th>
+                                <th class="py-3 px-3.5">Marca y Normativa</th>
+                                <th class="py-3 px-3.5">Lote y Ubicación</th>
+                                <th class="py-3 px-3.5">Fabricación (DOM) / Vencimiento (DOE)</th>
+                                <th class="py-3 px-3.5 text-center">Estado de Vigencia</th>
+                                <th class="py-3 px-3.5 text-right">Stock Disponible</th>
+                                <th class="py-3 px-3.5 text-right">Acciones Rápidas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-xs">
+                            {% for it in items_inventario %}
+                            {% set info = it.convencion_info %}
+                            <tr class="hover:bg-sky-50/50 transition" data-inv-row-id="{{ it.id }}">
+                                <td class="py-3 px-3.5 whitespace-nowrap">
+                                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-slate-100 text-[#002060] border border-slate-300">
+                                        Warehouse {{ it.warehouse }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-3.5 font-mono-code font-bold text-slate-800 whitespace-nowrap">
+                                    {{ it.codigo_barras }}
+                                </td>
+                                <td class="py-3 px-3.5">
+                                    <div class="font-extrabold text-[#002060]">{{ it.parte_numero }}</div>
+                                    <div class="text-[11px] text-slate-600 line-clamp-1">{{ it.descripcion }}</div>
+                                </td>
+                                <td class="py-3 px-3.5">
+                                    <div class="font-bold text-slate-800">{{ it.marca or 'Estándar' }}</div>
+                                    <div class="text-[10px] text-slate-500">{{ it.normativa or 'MIL-SPEC' }}</div>
+                                </td>
+                                <td class="py-3 px-3.5">
+                                    <div class="font-mono-code font-bold text-slate-800">Lote: {{ it.lote or 'S/L' }}</div>
+                                    <div class="text-[10px] text-slate-500">Ubicación: {{ it.ubicacion or 'General' }}</div>
+                                </td>
+                                <td class="py-3 px-3.5 whitespace-nowrap">
+                                    <div class="text-[11px] text-slate-600">DOM: <strong>{{ it.dom.isoformat() if it.dom else 'N/A' }}</strong></div>
+                                    <div class="text-[11px] text-slate-800">DOE: <strong>{{ it.doe.isoformat() if it.doe else 'No perecedero' }}</strong></div>
+                                </td>
+                                <td class="py-3 px-3.5 text-center whitespace-nowrap">
+                                    <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold {% if info.color == 'rose' %}bg-rose-100 text-rose-800 border border-rose-300{% elif info.color == 'amber' %}bg-amber-100 text-amber-800 border border-amber-300{% elif info.color == 'emerald' %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-slate-100 text-slate-700 border border-slate-300{% endif %}">
+                                        {{ info.convencion }}
+                                    </span>
+                                    {% if info.vigencia_dias is not none %}
+                                    <div class="text-[10px] text-slate-500 mt-0.5">{{ info.vigencia_dias }} días</div>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-3.5 text-right whitespace-nowrap">
+                                    <div class="text-base font-extrabold font-mono-code text-[#002060]" data-inv-stock="{{ it.id }}">
+                                        {{ it.existencia }}
+                                    </div>
+                                    <div class="text-[10px] font-bold text-slate-500">{{ it.medida or 'UND' }}</div>
+                                    <div class="text-[9px] text-slate-400" data-inv-updated-by="{{ it.id }}">
+                                        Por: {{ it.actualizado_por_nombre or 'Sistema' }}
+                                    </div>
+                                </td>
+                                <td class="py-3 px-3.5 text-right whitespace-nowrap">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <button type="button"
+                                                @click="codigoPistola = '{{ it.codigo_barras }}'; modoPistola = 'ENTRADA'; procesarEscaneoPistola()"
+                                                class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold"
+                                                title="Sumar 1 unidad inmediatamente">
+                                            +1
+                                        </button>
+                                        <button type="button"
+                                                @click="codigoPistola = '{{ it.codigo_barras }}'; modoPistola = 'SALIDA'; procesarEscaneoPistola()"
+                                                class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold"
+                                                title="Descontar 1 unidad inmediatamente">
+                                            -1
+                                        </button>
+                                        <button type="button"
+                                                @click="abrirModalDespacho({{ it.id }})"
+                                                class="px-2.5 py-1 rounded-lg bg-[#002060] hover:bg-[#001540] text-white text-[10px] font-extrabold">
+                                            Asignar a PO
+                                        </button>
+                                        <button type="button"
+                                                @click="abrirModalEditar({{ it.id }})"
+                                                class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold">
+                                            Editar
+                                        </button>
+                                        {% if user.rol in ['Jefe de area', 'Gerencia', 'Administrador'] %}
+                                        <form method="post" action="/inventario/{{ it.id }}/eliminar" class="inline"
+                                              onsubmit="return confirm('¿Confirmas que deseas eliminar este repuesto de la bodega?');">
+                                            <button type="submit"
+                                                    class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold">
+                                                Borrar
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="py-10 text-center text-xs text-slate-500">
+                                    No hay repuestos registrados en esta bodega con los criterios actuales. Usa el botón «+ Registrar Nuevo Repuesto en Bodega» para agregar el primero.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BITÁCORA EN VIVO DE MOVIMIENTOS DE BODEGA (SE ACTUALIZA SIN RECARGAR AL ESCANEAR CON TERA HW0009) -->
+            <div class="fly-card overflow-hidden">
+                <div class="px-4 sm:px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060]">
+                            Bitácora Reciente de Entradas, Salidas y Lecturas Tera HW0009
+                        </h3>
+                        <p class="text-[11px] text-slate-500">
+                            Cada disparo de la pistola lectora queda grabado automáticamente con fecha, hora de Bogotá y responsable.
+                        </p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 text-[10px] font-extrabold uppercase">
+                                <th class="py-2.5 px-3.5">Fecha y Hora (Bogotá)</th>
+                                <th class="py-2.5 px-3.5">Bodega</th>
+                                <th class="py-2.5 px-3.5">Tipo de Movimiento</th>
+                                <th class="py-2.5 px-3.5">Part Number / Código</th>
+                                <th class="py-2.5 px-3.5 text-right">Stock Anterior</th>
+                                <th class="py-2.5 px-3.5 text-right">Variación</th>
+                                <th class="py-2.5 px-3.5 text-right">Nuevo Stock</th>
+                                <th class="py-2.5 px-3.5">Orden PO / Nota</th>
+                                <th class="py-2.5 px-3.5">Responsable</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-bitacora-movimientos" class="divide-y divide-slate-200">
+                            {% for mv in movimientos_recientes %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2.5 px-3.5 font-mono-code text-[11px] text-slate-600">{{ mv.fecha_hora_bogota }}</td>
+                                <td class="py-2.5 px-3.5 font-bold text-[#002060]">Warehouse {{ mv.warehouse }}</td>
+                                <td class="py-2.5 px-3.5">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold {% if mv.cantidad_movimiento >= 0 %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-900{% endif %}">
+                                        {{ mv.tipo_movimiento }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-3.5 font-bold text-slate-800">{{ mv.parte_numero }} <span class="text-slate-400 font-mono-code">({{ mv.codigo_barras }})</span></td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code">{{ mv.cantidad_anterior }}</td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code font-extrabold {% if mv.cantidad_movimiento >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">
+                                    {% if mv.cantidad_movimiento > 0 %}+{{ mv.cantidad_movimiento }}{% else %}{{ mv.cantidad_movimiento }}{% endif %}
+                                </td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code font-extrabold text-[#002060]">{{ mv.cantidad_nueva }}</td>
+                                <td class="py-2.5 px-3.5 text-[11px] text-slate-600">{{ mv.po_asociada or mv.observacion }}</td>
+                                <td class="py-2.5 px-3.5 font-semibold text-slate-700">{{ mv.usuario_nombre }}</td>
+                            </tr>
+                            {% else %}
+                            <tr id="fila-sin-movimientos">
+                                <td colspan="9" class="py-6 text-center text-xs text-slate-400">
+                                    Aún no se han registrado movimientos recientes en la bitácora.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- MODAL CREAR / EDITAR REPUESTO EN BODEGA -->
+            <div x-show="modalItem" x-cloak
+                 class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+                 @keydown.escape.window="modalItem = false">
+                <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+                     @click.outside="modalItem = false">
+                    <div class="bg-[#002060] text-white px-6 py-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-300">Ficha Técnica de Almacén</p>
+                            <h3 class="text-base font-extrabold" x-text="formItem.item_id ? 'Editar Repuesto en Bodega' : 'Registrar Nuevo Repuesto en Bodega'"></h3>
+                        </div>
+                        <button type="button" @click="modalItem = false" class="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg">
+                            Cerrar
+                        </button>
+                    </div>
+                    <form method="post" action="/inventario/guardar" class="p-6 overflow-y-auto space-y-4">
+                        <input type="hidden" name="item_id" :value="formItem.item_id">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Bodega (Warehouse)</label>
+                                <select name="warehouse" x-model="formItem.warehouse"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white">
+                                    <option value="1">Warehouse 1 (Bodega 1)</option>
+                                    <option value="2">Warehouse 2 (Bodega 2)</option>
+                                    <option value="3">Warehouse 3 (Bodega 3)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Código de Barras</label>
+                                <input type="text" name="codigo_barras" x-model="formItem.codigo_barras" required
+                                       placeholder="Escanea o escribe el código..."
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono-code font-bold">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Part Number (Referencia)</label>
+                                <input type="text" name="parte_numero" x-model="formItem.parte_numero" required
+                                       placeholder="Ej. MS27212-1-8"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold uppercase">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Descripción clara del repuesto</label>
+                                <input type="text" name="descripcion" x-model="formItem.descripcion" required
+                                       placeholder="Nombre técnico o comercial del producto..."
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Unidad de Medida</label>
+                                <select name="medida" x-model="formItem.medida"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold bg-white">
+                                    {% for um in unidades_medida %}
+                                    <option value="{{ um }}">{{ um }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Marca / Fabricante</label>
+                                <input type="text" name="marca" x-model="formItem.marca"
+                                       placeholder="Ej. Honeywell, 3M, Boeing..."
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Normativa Técnica</label>
+                                <input type="text" name="normativa" x-model="formItem.normativa"
+                                       placeholder="Ej. MIL-SPEC / HAZMAT"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Número de Lote</label>
+                                <input type="text" name="lote" x-model="formItem.lote"
+                                       placeholder="Ej. LOT-2026-A"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono-code">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Fecha Fabricación (DOM)</label>
+                                <input type="date" name="dom" x-model="formItem.dom"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Fecha Vencimiento (DOE)</label>
+                                <input type="date" name="doe" x-model="formItem.doe"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Cantidad en Stock</label>
+                                <input type="number" name="existencia" x-model="formItem.existencia" min="0" required
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-extrabold">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Ubicación en Estante</label>
+                                <input type="text" name="ubicacion" x-model="formItem.ubicacion"
+                                       placeholder="Ej. EST-A1-N2"
+                                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                            <button type="button" @click="modalItem = false"
+                                    class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="px-5 py-2 rounded-xl bg-[#002060] hover:bg-[#001540] text-white text-xs font-extrabold shadow-md">
+                                Guardar Repuesto en Bodega
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL DESPACHAR MATERIAL A UNA ORDEN DE COMPRA (PO) -->
+            <div x-show="modalDespacho" x-cloak
+                 class="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4"
+                 @keydown.escape.window="modalDespacho = false">
+                <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden"
+                     @click.outside="modalDespacho = false">
+                    <div class="bg-[#002060] text-white px-6 py-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-extrabold uppercase tracking-widest text-sky-300">Salida Controlada de Almacén</p>
+                            <h3 class="text-base font-extrabold">Asignar y Despachar Repuesto a una PO</h3>
+                        </div>
+                        <button type="button" @click="modalDespacho = false" class="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg">
+                            Cerrar
+                        </button>
+                    </div>
+                    <form method="post" action="/inventario/despachar_po" class="p-6 space-y-4">
+                        <input type="hidden" name="item_id" :value="formDespacho.item_id">
+                        <input type="hidden" name="warehouse" :value="formDespacho.warehouse">
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                            <div>Repuesto: <strong class="text-[#002060]" x-text="formDespacho.parte_numero"></strong></div>
+                            <div>Bodega origen: <strong>Warehouse <span x-text="formDespacho.warehouse"></span></strong></div>
+                            <div>Disponible actual: <strong class="text-emerald-700" x-text="formDespacho.disponible + ' ' + formDespacho.medida"></strong></div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Número de Orden de Compra (PO)</label>
+                            <input type="text" name="po_numero" x-model="formDespacho.po_numero" list="lista-pos-activas" required
+                                   placeholder="Escribe o selecciona la PO destino..."
+                                   class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-extrabold uppercase text-slate-700 mb-1">Cantidad a despachar</label>
+                            <input type="number" name="cantidad" x-model="formDespacho.cantidad" min="1" :max="formDespacho.disponible || 1" required
+                                   class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-extrabold">
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" @click="modalDespacho = false"
+                                    class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md">
+                                Confirmar Salida de Bodega
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+            {% block content %}{% endblock %}
+        {% endif %}
     </main>
+
+    <!-- PIE DE PÁGINA CORPORATIVO OBLIGATORIO -->
+    <footer class="bg-white border-t border-slate-200/90 mt-8">
+        <div class="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <div class="font-bold text-[#002060]">
+                Copyright © 2026 Fly Logistic. Todos los derechos reservados.
+            </div>
+            <div class="text-[11px] text-slate-500">
+                Centro de Comando Logístico y Trazabilidad Aeronáutica — Bogotá D.C., Colombia
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    function relojJornadaApp() {
+        const cfg = {{ (estado_horario_json or '{}') | safe }};
+        const aSegundos = (hhmm) => {
+            if (!hhmm || typeof hhmm !== 'string' || !hhmm.includes(':')) return 0;
+            const p = hhmm.split(':');
+            return (parseInt(p[0], 10) || 0) * 3600 + (parseInt(p[1], 10) || 0) * 60;
+        };
+        const inicioJornadaSeg = 8 * 3600;
+        const limiteTexto = cfg.hora_limite || '';
+        const limiteSeg = aSegundos(limiteTexto);
+
+        return {
+            horaBogotaVivo: cfg.hora_actual || '',
+            cierreOperativo: '',
+            estadoJornada: '',
+            porcentajeJornada: 0,
+            aplicaRestriccion: Boolean(cfg.aplica_restriccion),
+            autorizacionActiva: Boolean(cfg.autorizacion_temporal),
+            desbloqueoHasta: cfg.desbloqueo_hasta_str || '',
+            horarioRestringido: cfg.permitido === false,
+            modalDesbloqueoHorario: false,
+            iniciar() {
+                const formato = new Intl.DateTimeFormat('es-CO', {
+                    timeZone: 'America/Bogota',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hourCycle: 'h23'
+                });
+                const pad = (n) => String(n).padStart(2, '0');
+                const actualizarReloj = () => {
+                    try {
+                        const partes = {};
+                        formato.formatToParts(new Date()).forEach((p) => { partes[p.type] = p.value; });
+                        const h = parseInt(partes.hour, 10);
+                        const m = parseInt(partes.minute, 10);
+                        const s = parseInt(partes.second, 10);
+                        const ahoraSeg = h * 3600 + m * 60 + s;
+                        this.horaBogotaVivo = pad(h) + ':' + pad(m) + ':' + pad(s);
+
+                        if (this.aplicaRestriccion && this.desbloqueoHasta) {
+                            this.autorizacionActiva = ahoraSeg < aSegundos(this.desbloqueoHasta);
+                        }
+                        if (limiteSeg > 0) {
+                            const restante = limiteSeg - ahoraSeg;
+                            if (restante > 0) {
+                                const hh = Math.floor(restante / 3600);
+                                const mm = Math.floor((restante % 3600) / 60);
+                                const ss = restante % 60;
+                                this.estadoJornada = 'Cierre de jornada (' + limiteTexto + ') en';
+                                this.cierreOperativo = pad(hh) + ':' + pad(mm) + ':' + pad(ss);
+                            } else {
+                                this.estadoJornada = 'Jornada habitual finalizada a las ' + limiteTexto;
+                                this.cierreOperativo = '';
+                            }
+                            const total = limiteSeg - inicioJornadaSeg;
+                            const avance = Math.min(Math.max(ahoraSeg - inicioJornadaSeg, 0), total);
+                            this.porcentajeJornada = Math.round((avance / total) * 100);
+                            this.horarioRestringido = this.aplicaRestriccion && restante <= 0 && !this.autorizacionActiva;
+                        }
+                    } catch (e) {
+                        this.horaBogotaVivo = '';
+                    }
+                };
+                actualizarReloj();
+                setInterval(actualizarReloj, 1000);
+            }
+        };
+    }
+    </script>
 </body>
 </html>

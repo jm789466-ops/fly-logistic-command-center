@@ -29,7 +29,7 @@
 
     <form method="post" action="" id="po-form" enctype="multipart/form-data" onsubmit="return validarFormularioPO()">
         <div class="mb-7">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">1. Información del Pedido y Cliente</h2>
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">1. Datos del pedido y del cliente</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Fecha Inicial:</label>
@@ -47,13 +47,16 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Asesor Responsable:</label>
                     {% if user.rol in ['Administrador', 'Gerencia', 'Jefe de area'] %}
-                    <select name="asesor_asignado_id" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-slate-50 font-semibold">
+                    <select name="asesor_asignado_id" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-sm bg-slate-50 font-semibold focus:ring-2 focus:ring-[#002060]">
                         {% for a in asesores_disponibles %}
                         <option value="{{ a.id }}" {% if d.get('asesor_asignado_id') == (a.id ~ '') %}selected{% endif %}>{{ a.nombre }} ({{ a.rol }})</option>
                         {% endfor %}
                     </select>
                     {% else %}
-                    <input type="text" value="{{ user.nombre }}" class="w-full h-10 border border-slate-200 bg-slate-100 px-3 rounded-lg text-sm text-slate-600 font-semibold" readonly>
+                    <div class="relative">
+                        <input type="text" value="{{ user.nombre }}" class="w-full h-10 border border-slate-200 bg-slate-100 px-3 rounded-lg text-sm text-slate-600 font-semibold cursor-not-allowed" readonly title="Campo bloqueado: cada asesor es responsable directo de sus órdenes de compra">
+                        <span class="absolute right-3 top-2.5 text-[10px] font-extrabold text-slate-500 uppercase bg-slate-200 px-2 py-0.5 rounded">Asignado</span>
+                    </div>
                     <input type="hidden" name="asesor_asignado_id" value="{{ user.id }}">
                     {% endif %}
                 </div>
@@ -68,7 +71,22 @@
         </div>
 
         <div class="mb-7">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">2. Detalles de los Productos, Cobros Adicionales (Hazmat / Certificados) y Estados</h2>
+            <div class="flex flex-wrap items-center justify-between border-b border-slate-200 pb-2 mb-4 gap-2">
+                <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] uppercase tracking-wider">2. Repuestos, recargos técnicos y estado de compra</h2>
+                <div class="flex flex-wrap items-center gap-2 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+                    <span class="font-bold text-slate-600 text-[11px]">Validar Stock en Bodega:</span>
+                    <select id="wh_consulta_po" class="h-7 border border-slate-300 rounded px-2 text-[11px] font-bold bg-white text-[#002060]">
+                        <option value="1">Warehouse 1</option>
+                        <option value="2">Warehouse 2</option>
+                        <option value="3">Warehouse 3</option>
+                    </select>
+                    <input type="text" id="pn_consulta_po" placeholder="Part Number..." class="h-7 border border-slate-300 rounded px-2 text-[11px] bg-white w-32 font-semibold">
+                    <button type="button" onclick="consultarStockBodegaEnFormulario()" class="bg-[#002060] hover:bg-blue-900 text-white px-2.5 h-7 rounded text-[11px] font-bold transition">
+                        Verificar Stock
+                    </button>
+                    <span id="resultado_stock_po" class="text-[11px] font-extrabold text-slate-700"></span>
+                </div>
+            </div>
             <div id="items-container" class="space-y-4 mb-4">
                 {% set lista_items = d.get('items') if d.get('items') else [{'fecha_compra_prov': '', 'proveedor': '', 'parte_numero': '', 'parte_numero_alterno': '', 'unidad_medida': 'UND', 'descripcion': '', 'cantidad': '1', 'precio_unitario': '', 'cobro_hazmat': '0.00', 'cobro_certificado': '0.00', 'sin_iva': '0', 'iva_item': '19', 'estado_producto': 'PENDIENTE'}] %}
                 {% for item in lista_items %}
@@ -161,7 +179,7 @@
         </div>
 
         <div class="mb-7">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">3. Valores y Facturación</h2>
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">3. Valores y facturación</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-start">
                 <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Método de pago:</label>
@@ -214,7 +232,7 @@
 
         <div class="mb-7">
             <div class="flex flex-wrap justify-between items-center border-b border-slate-200 pb-2 mb-4 gap-2">
-                <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] uppercase tracking-wider">4. Logística y Entregas</h2>
+                <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] uppercase tracking-wider">4. Logística y entregas</h2>
                 <div id="badge-semaforo-form" class="px-3.5 py-1 rounded-full text-xs font-extrabold bg-slate-200 text-slate-700">
                     Defina el plazo de entrega
                 </div>
@@ -235,12 +253,42 @@
                 </div>
             </div>
 
+            <!-- MOTOR DE TRACKING INTEGRADO (FEDEX, COORDINADORA, DHL, CLICKMAIL) -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060]">Motor de Tracking Logístico (FedEx, Coordinadora, DHL, Clickmail)</h3>
+                    <a id="link-tracking-vivo" href="#" target="_blank" class="hidden px-3 py-1 rounded-lg bg-[#002060] text-white text-[11px] font-bold hover:bg-blue-900 transition">
+                        Verificar Guía en Portal Oficial
+                    </a>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Transportadora Oficial:</label>
+                        <select name="transportadora" id="transportadora" onchange="actualizarTrackingEnVivo()" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-bold text-[#002060]">
+                            <option value="">Auto-detectar según guía / Seleccionar...</option>
+                            {% for tr in (transportadoras_opciones or ['FedEx', 'Coordinadora', 'DHL', 'Clickmail', 'Inter Rapidísimo']) %}
+                            <option value="{{ tr }}" {% if d.get('transportadora') == tr %}selected{% endif %}>{{ tr }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Número de Guía / Tracking Nacional:</label>
+                        <input type="text" name="numero_guia_nacional" id="numero_guia_nacional" value="{{ d.get('numero_guia_nacional', '') }}" oninput="actualizarTrackingEnVivo()" placeholder="Ej. Guía Coordinadora / FedEx / DHL..." class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-semibold">
+                    </div>
+                    <div>
+                        <div id="estado-tracking-vivo" class="h-10 px-3 rounded-lg border border-slate-200 bg-white flex items-center text-xs font-bold text-slate-600">
+                            Ingrese número de guía o seleccione transportadora
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="bloque-internacional" class="bg-sky-50 border border-sky-200 rounded-xl p-4 mt-4">
                 <h3 class="text-xs font-extrabold uppercase tracking-wider text-[#002060] mb-3">Logística Internacional, Warehouse EE. UU. y Nacionalización</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">Modalidad Warehouse EE. UU.:</label>
-                        <select name="llega_click_mail" id="llega_click_mail" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-semibold">
+                        <select name="llega_click_mail" id="llega_click_mail" onchange="actualizarTrackingEnVivo()" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-semibold">
                             <option value="Si" {% if d.get('llega_click_mail') == 'Si' %}selected{% endif %}>Click Mail / Warehouse EE. UU.</option>
                             <option value="No" {% if d.get('llega_click_mail', 'No') == 'No' %}selected{% endif %}>Otra Transportadora / Envío Directo</option>
                         </select>
@@ -251,7 +299,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">Tracking Internacional:</label>
-                        <input type="text" name="tracking" value="{{ d.get('tracking', '') }}" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white">
+                        <input type="text" name="tracking" id="tracking_internacional" value="{{ d.get('tracking', '') }}" oninput="actualizarTrackingEnVivo()" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1">Estado de Nacionalización:</label>
@@ -275,21 +323,40 @@
 
         <!-- SECCIÓN 5: CIERRE Y DOCUMENTACIÓN MÚLTIPLE CON ALPINE.JS (VISTA PREVIA Y ELIMINACIÓN) -->
         <div class="mb-7" x-data="documentosPoApp()">
-            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">5. Cierre y Documentación Múltiple (Hasta 10 Archivos en Google Drive)</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 items-end">
+            <h2 class="text-xs sm:text-sm font-extrabold text-[#002060] border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">5. Cierre de la orden y documentos de soporte (hasta 10 archivos)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 items-end">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Referencia / N° Factura / Soporte:</label>
                     <input type="text" name="documentacion" value="{{ d.get('documentacion', '') }}" placeholder="Ej. Factura F-1024 / Packing Slip..." class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Estado General de la PO:</label>
-                    <select name="estado_general" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-bold">
+                    <select name="estado_general" id="estado_general" onchange="calcularSemaforoDias()" class="w-full h-10 border border-slate-300 px-3 rounded-lg text-xs bg-white font-bold">
                         {% for est in estados %}
                         <option value="{{ est }}" {% if d.get('estado_general') == est %}selected{% endif %}>{{ est }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-amber-800 mb-1.5">Motivo de Cancelación / Retención Histórica:</label>
+                    <input type="text" name="motivo_cancelacion" id="motivo_cancelacion" value="{{ d.get('motivo_cancelacion', '') }}" placeholder="Requerido si el estado cambia a Cancelado..." class="w-full h-10 border border-amber-300 bg-amber-50/40 px-3 rounded-lg text-xs font-semibold">
+                </div>
             </div>
+
+            {% if pedido and pedido.historial %}
+            <div class="mb-4 p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl">
+                <span class="text-[11px] font-extrabold uppercase text-amber-900 block mb-2">Historial Retenido de Cambios de Estado y Cancelaciones ({{ pedido.po_codigo }}):</span>
+                <div class="space-y-1 max-h-36 overflow-y-auto">
+                    {% for h in pedido.historial %}
+                    <div class="text-xs bg-white px-3 py-1.5 rounded border border-amber-100 flex flex-wrap justify-between gap-2">
+                        <span class="font-bold text-slate-800">{{ h.accion }}: {{ h.estado_anterior or 'Inicio' }} -> {{ h.estado_nuevo }}</span>
+                        <span class="text-slate-600">{{ h.motivo }}</span>
+                        <span class="text-[11px] text-slate-400">{{ h.usuario_nombre }} ({{ h.creado_en.strftime('%Y-%m-%d %H:%M') if h.creado_en else '' }})</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <div class="mb-4 p-4 bg-blue-50/40 border border-blue-200 rounded-xl">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -339,6 +406,12 @@
                                 <a :href="doc.drive_link || '#'" target="_blank" class="text-blue-600 hover:underline font-bold truncate" x-text="doc.nombre_archivo"></a>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
+                                {% if pedido %}
+                                <button type="button" @click="abrirVisorEnFormulario({{ pedido.id }}, doc.nombre_archivo)"
+                                        class="px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-[#002060] font-bold text-[11px] transition">
+                                    Previsualizar
+                                </button>
+                                {% endif %}
                                 <a :href="`/pedidos/{{ pedido.id if pedido else 0 }}/documento?nombre=${encodeURIComponent(doc.nombre_archivo)}`" 
                                    class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]" x-show="{{ 'true' if pedido else 'false' }}">
                                     Descargar
@@ -352,6 +425,17 @@
                             </div>
                         </div>
                     </template>
+
+                    <!-- VISOR INTEGRADO EN FORMULARIO DE EDICIÓN -->
+                    <div x-show="visorFormularioUrl" x-cloak class="mt-3 bg-slate-900 rounded-xl overflow-hidden border border-slate-700 shadow-lg">
+                        <div class="px-3.5 py-2 bg-slate-800 text-white flex justify-between items-center text-xs">
+                            <span class="font-bold truncate">Previsualizando soporte: <span class="text-sky-300" x-text="visorFormularioNombre"></span></span>
+                            <button type="button" @click="visorFormularioUrl = ''" class="bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-[10px] font-bold">
+                                Cerrar Visor
+                            </button>
+                        </div>
+                        <iframe :src="visorFormularioUrl" class="w-full h-[380px] bg-white border-0"></iframe>
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -362,7 +446,7 @@
             </div>
         </div>
 
-        <button type="submit" id="btn-guardar-po" class="w-full fly-bg fly-hover text-white font-extrabold py-3.5 rounded-xl shadow-md transition text-xs sm:text-sm uppercase tracking-wider">
+        <button type="submit" id="btn-guardar-po" class="w-full bg-[#002060] hover:bg-[#001540] text-white font-extrabold py-3.5 rounded-xl shadow-md transition text-xs sm:text-sm uppercase tracking-wider">
             Guardar Orden de Compra y Generar Reporte Excel
         </button>
 
@@ -377,6 +461,13 @@ function documentosPoApp() {
     return {
         archivosNuevos: [],
         documentosExistentes: {{ d.get('documentos_adjuntos', []) | tojson | safe }},
+        visorFormularioUrl: '',
+        visorFormularioNombre: '',
+
+        abrirVisorEnFormulario(pedidoId, nombreArchivo) {
+            this.visorFormularioNombre = nombreArchivo;
+            this.visorFormularioUrl = `/pedidos/${pedidoId}/documento/preview?nombre=${encodeURIComponent(nombreArchivo)}`;
+        },
 
         procesarArchivosSeleccionados(event) {
             const input = event.target;
@@ -430,22 +521,29 @@ function documentosPoApp() {
     }
 }
 
+const desgloseInicialPagos = {{ d.get('desglose_pagos_dict', {}) | tojson | safe }};
+
 function actualizarDesglosePagos() {
     const checks = document.querySelectorAll('.metodo-check:checked');
     const seleccionados = Array.from(checks).map(c => c.value);
     const container = document.getElementById('desglose-montos-container');
     const inputsContainer = document.getElementById('inputs-desglose-pagos');
     
+    const valoresPrevios = {};
+    inputsContainer.querySelectorAll('input').forEach(inp => {
+        if (inp.value) valoresPrevios[inp.name] = inp.value;
+    });
     inputsContainer.innerHTML = '';
     
     if (seleccionados.length >= 2) {
         container.classList.remove('hidden');
         seleccionados.forEach(mp => {
+            const valExistente = valoresPrevios[`monto_${mp}`] || desgloseInicialPagos[mp] || '';
             const div = document.createElement('div');
             div.className = 'flex items-center gap-2';
             div.innerHTML = `
                 <span class="text-xs font-bold text-slate-700 w-28 truncate">${mp}:</span>
-                <input type="number" step="0.01" min="0" name="monto_${mp}" placeholder="Monto $" class="h-8 border border-slate-300 px-2.5 rounded-lg text-xs w-full bg-white font-semibold">
+                <input type="number" step="0.01" min="0" name="monto_${mp}" value="${valExistente}" placeholder="Monto $" class="h-8 border border-slate-300 px-2.5 rounded-lg text-xs w-full bg-white font-semibold">
             `;
             inputsContainer.appendChild(div);
         });
@@ -457,6 +555,37 @@ function actualizarDesglosePagos() {
     if (seleccionados.length > 0) {
         document.getElementById('alerta-metodo-pago').classList.add('hidden');
     }
+}
+
+async function actualizarTrackingEnVivo() {
+    const trSel = document.getElementById('transportadora');
+    const guiaNac = document.getElementById('numero_guia_nacional');
+    const guiaInt = document.getElementById('tracking_internacional');
+    const clickMailSel = document.getElementById('llega_click_mail');
+    const estadoBox = document.getElementById('estado-tracking-vivo');
+    const linkEl = document.getElementById('link-tracking-vivo');
+    if (!estadoBox) return;
+
+    const guia = ((guiaInt && guiaInt.value) ? guiaInt.value : (guiaNac ? guiaNac.value : '')).trim();
+    const tr = trSel ? trSel.value : '';
+    const cm = (clickMailSel && clickMailSel.value === 'Si') ? '1' : '0';
+
+    try {
+        const res = await fetch(`/api/tracking?guia=${encodeURIComponent(guia)}&transportadora=${encodeURIComponent(tr)}&clickmail=${cm}`);
+        const info = await res.json();
+        if (info && info.carrier) {
+            estadoBox.textContent = `${info.estado_tracking} (${info.carrier}${info.guia ? ' · ' + info.guia : ''})`;
+            estadoBox.className = 'h-10 px-3 rounded-lg border border-sky-300 bg-sky-50 flex items-center text-xs font-extrabold text-[#002060]';
+            if (linkEl && info.url) {
+                linkEl.href = info.url;
+                linkEl.classList.remove('hidden');
+            }
+        } else {
+            estadoBox.textContent = 'Ingrese número de guía o seleccione transportadora';
+            estadoBox.className = 'h-10 px-3 rounded-lg border border-slate-200 bg-white flex items-center text-xs font-bold text-slate-600';
+            if (linkEl) linkEl.classList.add('hidden');
+        }
+    } catch (e) {}
 }
 
 function sincronizarMetodosPago() {
@@ -712,11 +841,19 @@ function eliminarItem(btn) {
 function calcularSemaforoDias() {
     const plazoTxt = document.getElementById('plazo_entrega').value;
     const entregaTxt = document.getElementById('fecha_entrega_cliente').value;
+    const estadoSel = document.getElementById('estado_general');
+    const estadoVal = estadoSel ? estadoSel.value : '';
     let poTxt = (document.getElementById('po_numero').value || 'ACTUAL').trim();
     if (!poTxt.toUpperCase().startsWith('PO')) {
         poTxt = 'PO-' + poTxt;
     }
     const badge = document.getElementById('badge-semaforo-form');
+
+    if (estadoVal === 'Cancelado') {
+        badge.className = 'px-4 py-1 rounded-full text-xs font-extrabold bg-amber-600 text-white shadow';
+        badge.textContent = `${poTxt} | CANCELADO (HISTORIAL RETENIDO)`;
+        return;
+    }
 
     if (!plazoTxt) {
         badge.className = 'px-3.5 py-1 rounded-full text-xs font-extrabold bg-slate-200 text-slate-700';
@@ -750,8 +887,78 @@ function calcularSemaforoDias() {
     }
 }
 
+function cargarCotizacionDesdeSessionStorage() {
+    {% if modo == 'nuevo' %}
+    try {
+        const raw = sessionStorage.getItem('cotizacion_to_po');
+        if (!raw) return;
+        sessionStorage.removeItem('cotizacion_to_po');
+        const data = JSON.parse(raw);
+        if (data.cliente) {
+            const inpCli = document.querySelector('input[name="cliente"]');
+            if (inpCli && !inpCli.value) inpCli.value = data.cliente;
+        }
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            const container = document.getElementById('items-container');
+            container.querySelectorAll('.item-row').forEach((r, idx) => { if (idx > 0) r.remove(); });
+            data.items.forEach((it, idx) => {
+                if (idx > 0) agregarItem();
+                const rows = container.querySelectorAll('.item-row');
+                const row = rows[rows.length - 1];
+                if (!row) return;
+                const pNum = row.querySelector('input[name="parte_numero"]');
+                const desc = row.querySelector('input[name="descripcion"]');
+                const prov = row.querySelector('input[name="proveedor"]');
+                const cant = row.querySelector('input[name="cantidad"]');
+                const prec = row.querySelector('input[name="precio_unitario"]');
+                const uni = row.querySelector('select[name="unidad_medida"]');
+                if (pNum) pNum.value = it.parte_numero || '';
+                if (desc) desc.value = it.descripcion || it.parte_numero || '';
+                if (prov) prov.value = it.proveedor || 'Por definir';
+                if (cant) cant.value = it.cantidad || '1';
+                if (prec) prec.value = it.precio_unitario || '0.00';
+                if (uni && it.unidad_medida) uni.value = it.unidad_medida;
+            });
+            recalcularTotales();
+        }
+    } catch (e) {}
+    {% endif %}
+}
+
+async function consultarStockBodegaEnFormulario() {
+    const wh = document.getElementById('wh_consulta_po').value || '1';
+    const pnInput = document.getElementById('pn_consulta_po');
+    const resEl = document.getElementById('resultado_stock_po');
+    let pn = (pnInput ? pnInput.value : '').trim();
+    if (!pn) {
+        const firstPn = document.querySelector('input[name="parte_numero"]');
+        if (firstPn && firstPn.value) {
+            pn = firstPn.value.trim();
+            if (pnInput) pnInput.value = pn;
+        }
+    }
+    if (!pn) {
+        resEl.textContent = 'Ingrese un Part Number para consultar.';
+        resEl.className = 'text-[11px] font-bold text-amber-700';
+        return;
+    }
+    try {
+        const res = await fetch(`/api/inventario/validar_stock?warehouse=${encodeURIComponent(wh)}&parte_numero=${encodeURIComponent(pn)}&cantidad=1`);
+        const data = await res.json();
+        resEl.textContent = data.msg || `Disponible: ${data.stock_disponible || 0}`;
+        resEl.className = data.disponible
+            ? 'text-[11px] font-extrabold text-emerald-700'
+            : 'text-[11px] font-extrabold text-red-600';
+    } catch (e) {
+        resEl.textContent = 'No fue posible consultar el inventario.';
+    }
+}
+
 cambiarTipoPedido(false);
+cargarCotizacionDesdeSessionStorage();
 calcularSemaforoDias();
 actualizarDesglosePagos();
+actualizarTrackingEnVivo();
 </script>
+<!-- Copyright © 2026 Fly Logistic. -->
 {% endblock %}

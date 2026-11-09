@@ -1,0 +1,8 @@
+{
+  "host": "smtp.tudominio.com",
+  "port": 465,
+  "user": "notificaciones@tudominio.com",
+  "password": "TU_CONTRASENA_AQUI",
+  "from": "Fly Logistic S.A.S. <notificaciones@tudominio.com>",
+  "app_url": "http://127.0.0.1:8000"
+}
