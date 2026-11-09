@@ -220,26 +220,35 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _drive_service = None
 
 
-def obtener_drive():
-    global _drive_service
+_drive_service = None
+_drive_creds = None
+
+
+def obtener_drive(forzar_refresh: bool = False):
+    global _drive_service, _drive_creds
     if not GOOGLE_DRIVE_DISPONIBLE or os.getenv("OMS_DISABLE_DRIVE") == "1":
         return None
-    if _drive_service:
-        return _drive_service
     if not os.path.exists(TOKEN_PATH):
         return None
     try:
-        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
-        if not creds.valid:
-            if creds.expired and creds.refresh_token:
-                creds.refresh(GoogleRequest())
-                with open(TOKEN_PATH, "w") as f:
-                    f.write(creds.to_json())
-            else:
+        if _drive_creds is None or forzar_refresh:
+            _drive_creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+        if forzar_refresh or not _drive_creds.valid:
+            if _drive_creds.expired and _drive_creds.refresh_token:
+                _drive_creds.refresh(GoogleRequest())
+                try:
+                    with open(TOKEN_PATH, "w") as f:
+                        f.write(_drive_creds.to_json())
+                except Exception as w_err:
+                    print(f"[GOOGLE DRIVE] Aviso persistiendo token renovado: {w_err}")
+                _drive_service = build("drive", "v3", credentials=_drive_creds, cache_discovery=False)
+            elif not _drive_creds.valid:
                 return None
-        _drive_service = build("drive", "v3", credentials=creds, cache_discovery=False)
+        elif _drive_service is None:
+            _drive_service = build("drive", "v3", credentials=_drive_creds, cache_discovery=False)
         return _drive_service
-    except Exception:
+    except Exception as exc:
+        print(f"[GOOGLE DRIVE AUTH ERROR]: {exc}")
         return None
 
 
@@ -4757,6 +4766,10 @@ def generar_y_sincronizar_cotizacion(db: Session, cot: models.Cotizacion) -> str
     if not os.path.exists(plantilla_original):
         return "Plantilla FORMATO COTIZACION VERSION 4.xlsx no encontrada."
 
+    if not cot.asesor and cot.asesor_id:
+        cot.asesor = db.get(models.Asesor, cot.asesor_id)
+
+    nombre_asesor = cot.asesor.nombre if cot.asesor else (cot.prepared_by or "Fly Logistic")
     cab = {
         "quote_number": cot.quote_number,
         "quote_date": cot.quote_date.strftime("%d/%m/%Y") if cot.quote_date else "",
@@ -4768,7 +4781,7 @@ def generar_y_sincronizar_cotizacion(db: Session, cot: models.Cotizacion) -> str
         "contact": cot.contact or "",
         "terms": cot.terms or "",
         "email": cot.email or "",
-        "prepared_by": cot.asesor.nombre if cot.asesor else (cot.prepared_by or "Fly Logistic"),
+        "prepared_by": nombre_asesor,
     }
     items = [{
         "item": idx + 1,
@@ -4780,7 +4793,6 @@ def generar_y_sincronizar_cotizacion(db: Session, cot: models.Cotizacion) -> str
     } for idx, it in enumerate(cot.items)]
 
     nombre_archivo = f"Cotizacion_{nombre_seguro(cot.quote_number)}.xlsx"
-    nombre_asesor = cot.asesor.nombre if cot.asesor else (cot.prepared_by or "General")
     carpeta_local = os.path.join(BASE_DIR, "Cotizaciones", nombre_seguro(nombre_asesor))
     os.makedirs(carpeta_local, exist_ok=True)
     ruta_local = os.path.join(carpeta_local, nombre_archivo)
@@ -4804,6 +4816,7 @@ def generar_y_sincronizar_cotizacion(db: Session, cot: models.Cotizacion) -> str
                 return "Cotización generada y sincronizada en Google Drive"
         return "Cotización generada localmente"
     except Exception as exc:
+        print(f"[GOOGLE DRIVE COTIZACION SYNC]: {exc}")
         return f"Excel generado localmente ({exc})"
 
 
@@ -4859,6 +4872,7 @@ def _datos_cotizador_desde_form(f, user: models.Asesor) -> dict:
     hazmats = f.getlist("cobro_hazmat") or f.getlist("item_hazmat")
     certificados = f.getlist("cobro_certificado") or f.getlist("item_certificado")
     sin_ivas = f.getlist("sin_iva") or f.getlist("item_sin_iva")
+    iva_pcts = f.getlist("iva_pct") or f.getlist("item_iva_pct")
     remarks_list = f.getlist("remarks") or f.getlist("item_remarks")
 
     items = []
@@ -4869,6 +4883,10 @@ def _datos_cotizador_desde_form(f, user: models.Asesor) -> dict:
         pr = (precios[i] if i < len(precios) else "").strip()
         if not (desc or rem or pr):
             continue
+        try:
+            iva_val = float(str(iva_pcts[i] if i < len(iva_pcts) else "19").replace(",", ""))
+        except Exception:
+            iva_val = 19.0
         items.append({
             "item": len(items) + 1,
             "description": desc,
@@ -4877,7 +4895,8 @@ def _datos_cotizador_desde_form(f, user: models.Asesor) -> dict:
             "unit_price": pr or "0.00",
             "cobro_hazmat": (hazmats[i] if i < len(hazmats) else "0.00").strip() or "0.00",
             "cobro_certificado": (certificados[i] if i < len(certificados) else "0.00").strip() or "0.00",
-            "sin_iva": "1" if (i < len(sin_ivas) and str(sin_ivas[i]).strip() in ("1", "true", "on")) else "0",
+            "sin_iva": "1" if (i < len(sin_ivas) and str(sin_ivas[i]).strip() in ("1", "true", "True", "on")) else "0",
+            "iva_pct": iva_val,
             "remarks": rem,
         })
 
@@ -4885,7 +4904,7 @@ def _datos_cotizador_desde_form(f, user: models.Asesor) -> dict:
         items = [{
             "item": 1, "description": "", "unit": "UND", "qty": "1",
             "unit_price": "0.00", "cobro_hazmat": "0.00", "cobro_certificado": "0.00",
-            "sin_iva": "0", "remarks": ""
+            "sin_iva": "0", "iva_pct": 19.0, "remarks": ""
         }]
 
     return {
@@ -4900,7 +4919,10 @@ def _datos_cotizador_desde_form(f, user: models.Asesor) -> dict:
         "site": (f.get("site") or "").strip(),
         "contact": (f.get("contact") or "").strip(),
         "terms": (f.get("terms") or "").strip(),
+        "incoterm": (f.get("incoterm") or "").strip(),
+        "delivery_time": (f.get("delivery_time") or "").strip(),
         "email": (f.get("email") or "").strip(),
+        "tipo_operacion": (f.get("tipo_operacion") or "Nacional").strip(),
         "moneda": (f.get("moneda") or "COP").strip().upper() if (f.get("moneda") or "COP").strip().upper() in ("COP", "USD") else "COP",
         "transport": (f.get("transport") or "0.00").strip(),
         "items": items,
@@ -4948,9 +4970,15 @@ def _guardar_cotizacion_en_bd(db: Session, user: models.Asesor, d: dict) -> mode
     cot.phone = d.get("phone") or ""
     cot.site = d.get("site") or ""
     cot.contact = d.get("contact") or ""
-    cot.terms = d.get("terms") or ""
+    terms_val = d.get("terms") or ""
+    if d.get("incoterm") and d.get("incoterm") not in terms_val:
+        terms_val = f"{terms_val} | Incoterm: {d.get('incoterm')}".strip(" |")
+    if d.get("delivery_time") and d.get("delivery_time") not in terms_val:
+        terms_val = f"{terms_val} | Entrega: {d.get('delivery_time')}".strip(" |")
+    cot.terms = terms_val
     cot.email = d.get("email") or ""
     cot.moneda = d.get("moneda") or "COP"
+    cot.tipo_operacion = d.get("tipo_operacion") or "Nacional"
     cot.transport = f"{transp_dec:.2f}"
 
     cot.items.clear()
@@ -4978,6 +5006,11 @@ def _guardar_cotizacion_en_bd(db: Session, user: models.Asesor, d: dict) -> mode
             ce_dec = Decimal("0.00")
 
         sin_iva_bool = str(it.get("sin_iva", "0")).strip() in ("1", "true", "True", "on")
+        try:
+            iva_pct_f = float(str(it.get("iva_pct") or ("19" if d.get("moneda") == "COP" else "7")).replace(",", ""))
+        except Exception:
+            iva_pct_f = 19.0 if d.get("moneda") == "COP" else 7.0
+
         cot.items.append(models.CotizacionItem(
             orden=idx + 1,
             description=desc,
@@ -4987,7 +5020,7 @@ def _guardar_cotizacion_en_bd(db: Session, user: models.Asesor, d: dict) -> mode
             cobro_hazmat=f"{hz_dec:.2f}",
             cobro_certificado=f"{ce_dec:.2f}",
             sin_iva=sin_iva_bool,
-            iva_item="0.00" if sin_iva_bool else "19.00",
+            iva_item="0.00" if sin_iva_bool else f"{iva_pct_f:.2f}",
             remarks=(it.get("remarks") or "").strip(),
         ))
 
@@ -5016,7 +5049,7 @@ def api_validar_cotizacion(q: str = "", numero: str = "", excluir_id: int = 0, d
 
 
 @app.get("/cotizador/nuevo", response_class=HTMLResponse)
-def cotizador_nuevo(request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+def cotizador_nuevo(request: Request, cot_id: int = 0, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
     if user.rol == "Almacenista":
         return RedirectResponse("/inventario?warehouse=1", status_code=303)
     permitido, msg_horario = validar_horario_asesor(user)
@@ -5025,38 +5058,129 @@ def cotizador_nuevo(request: Request, user: models.Asesor = Depends(usuario_actu
         return RedirectResponse("/pedidos", status_code=303)
 
     hoy = str(date.today())
+    expira_default = str(date.today() + timedelta(days=15))
     sugerida = sugerir_siguiente_cotizacion(db)
     d = {
         "quote_number": sugerida,
         "quote_date": hoy,
-        "expiration_date": "",
+        "expiration_date": expira_default,
         "prepared_by": user.nombre,
+        "asesor_id": str(user.id),
         "to_company": "",
         "ref_no": "",
         "phone": "",
         "site": "",
         "contact": "",
         "terms": "",
+        "incoterm": "",
+        "delivery_time": "",
         "email": "",
         "moneda": "COP",
+        "tipo_operacion": "Nacional",
         "transport": "0.00",
         "items": [{
             "description": "", "unit": "UND", "qty": "1", "unit_price": "0.00",
-            "cobro_hazmat": "0.00", "cobro_certificado": "0.00", "sin_iva": "0", "remarks": ""
+            "cobro_hazmat": "0.00", "cobro_certificado": "0.00", "sin_iva": "0", "iva_pct": "19", "remarks": ""
         }]
     }
+
+    if cot_id:
+        c_existente = db.query(models.Cotizacion).filter(models.Cotizacion.id == cot_id).first()
+        if c_existente:
+            d = {
+                "id": c_existente.id,
+                "quote_number": c_existente.numero,
+                "quote_date": str(c_existente.fecha or hoy),
+                "expiration_date": str(c_existente.fecha_expiracion or expira_default),
+                "prepared_by": c_existente.asesor.nombre if c_existente.asesor else (c_existente.prepared_by or user.nombre),
+                "asesor_id": str(c_existente.asesor_id or user.id),
+                "to_company": c_existente.empresa or "",
+                "ref_no": c_existente.ref_no or "",
+                "phone": c_existente.phone or "",
+                "site": c_existente.site or "",
+                "contact": c_existente.contact or "",
+                "terms": c_existente.terms or "",
+                "incoterm": "",
+                "delivery_time": "",
+                "email": c_existente.email or "",
+                "moneda": c_existente.moneda or "COP",
+                "tipo_operacion": c_existente.tipo_operacion or "Nacional",
+                "transport": str(c_existente.transporte or "0.00"),
+                "items": [{
+                    "description": it.description or "",
+                    "unit": it.unit or "UND",
+                    "qty": str(it.qty or 1),
+                    "unit_price": str(it.unit_price or "0.00"),
+                    "cobro_hazmat": str(it.cobro_hazmat or "0.00"),
+                    "cobro_certificado": str(it.cobro_certificado or "0.00"),
+                    "sin_iva": "1" if it.sin_iva else "0",
+                    "iva_pct": str(it.iva_porcentaje or ("19" if c_existente.moneda == "COP" else "7")),
+                    "remarks": it.remarks or ""
+                } for it in c_existente.items] or [{
+                    "description": "", "unit": "UND", "qty": "1", "unit_price": "0.00",
+                    "cobro_hazmat": "0.00", "cobro_certificado": "0.00", "sin_iva": "0", "iva_pct": "19", "remarks": ""
+                }]
+            }
+
+    items_serializados = []
+    for it in d.get("items", []):
+        try:
+            qty_val = float(str(it.get("qty") or "1").replace(",", ""))
+        except Exception:
+            qty_val = 1.0
+        try:
+            price_val = float(str(it.get("unit_price") or "0").replace(",", ""))
+        except Exception:
+            price_val = 0.0
+        try:
+            hz_val = float(str(it.get("cobro_hazmat") or "0").replace(",", ""))
+        except Exception:
+            hz_val = 0.0
+        try:
+            cert_val = float(str(it.get("cobro_certificado") or "0").replace(",", ""))
+        except Exception:
+            cert_val = 0.0
+        sin_iva_val = str(it.get("sin_iva") or "0") in ("1", "true", "True")
+        try:
+            iva_val = float(str(it.get("iva_pct") or ("19" if d.get("moneda") == "COP" else "7")).replace(",", ""))
+        except Exception:
+            iva_val = 19.0 if d.get("moneda") == "COP" else 7.0
+
+        items_serializados.append({
+            "description": it.get("description") or "",
+            "qty": qty_val,
+            "unit": it.get("unit") or "UND",
+            "unit_price": price_val,
+            "hazmat": hz_val,
+            "certificado": cert_val,
+            "sin_iva": sin_iva_val,
+            "iva_pct": iva_val,
+            "remarks": it.get("remarks") or "",
+        })
+    d["items_json"] = json.dumps(items_serializados)
+
     asesores_disponibles = db.query(models.Asesor).order_by(models.Asesor.nombre).all()
+    clientes_cot = [c[0] for c in db.query(models.Cotizacion.empresa).filter(models.Cotizacion.empresa.isnot(None), models.Cotizacion.empresa != '').distinct().all()]
+    clientes_ped = [c[0] for c in db.query(models.Cliente.nombre).filter(models.Cliente.nombre.isnot(None), models.Cliente.nombre != '').distinct().all()]
+    clientes = sorted(list(set([c.strip() for c in (clientes_cot + clientes_ped) if c and c.strip()])))
+
     return render(request, "cotizador_form.html", {
         "user": user,
         "d": d,
         "max_items": MAX_ITEMS_COTIZADOR,
         "fecha_hoy": hoy,
+        "hoy": hoy,
+        "expira_default": expira_default,
+        "sugerencia_quote": d["quote_number"],
+        "clientes": clientes,
         "unidades_medida": UNIDADES_MEDIDA,
         "asesores_disponibles": asesores_disponibles,
     })
 
 
+@app.post("/cotizador/generar")
 @app.post("/cotizador/guardar")
+@app.post("/cotizador/exportar_excel")
 async def cotizador_guardar(request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
     if user.rol == "Almacenista":
         return RedirectResponse("/inventario?warehouse=1", status_code=303)
@@ -5066,18 +5190,66 @@ async def cotizador_guardar(request: Request, user: models.Asesor = Depends(usua
         return RedirectResponse("/pedidos", status_code=303)
 
     f = await request.form()
+    accion_posterior = (f.get("accion_posterior") or "").strip()
     d = _datos_cotizador_desde_form(f, user)
     if not d["quote_number"]:
         d["quote_number"] = sugerir_siguiente_cotizacion(db)
 
     items_validos = [it for it in d["items"] if (it.get("description") or "").strip()]
     asesores_disponibles = db.query(models.Asesor).order_by(models.Asesor.nombre).all()
+    hoy = str(date.today())
+    expira_default = str(date.today() + timedelta(days=15))
+    clientes_cot = [c[0] for c in db.query(models.Cotizacion.empresa).filter(models.Cotizacion.empresa.isnot(None), models.Cotizacion.empresa != '').distinct().all()]
+    clientes_ped = [c[0] for c in db.query(models.Cliente.nombre).filter(models.Cliente.nombre.isnot(None), models.Cliente.nombre != '').distinct().all()]
+    clientes = sorted(list(set([c.strip() for c in (clientes_cot + clientes_ped) if c and c.strip()])))
+
+    items_serializados = []
+    for it in d.get("items", []):
+        try:
+            qty_val = float(str(it.get("qty") or "1").replace(",", ""))
+        except Exception:
+            qty_val = 1.0
+        try:
+            price_val = float(str(it.get("unit_price") or "0").replace(",", ""))
+        except Exception:
+            price_val = 0.0
+        try:
+            hz_val = float(str(it.get("cobro_hazmat") or "0").replace(",", ""))
+        except Exception:
+            hz_val = 0.0
+        try:
+            cert_val = float(str(it.get("cobro_certificado") or "0").replace(",", ""))
+        except Exception:
+            cert_val = 0.0
+        sin_iva_val = str(it.get("sin_iva") or "0") in ("1", "true", "True")
+        try:
+            iva_val = float(str(it.get("iva_pct") or ("19" if d.get("moneda") == "COP" else "7")).replace(",", ""))
+        except Exception:
+            iva_val = 19.0 if d.get("moneda") == "COP" else 7.0
+
+        items_serializados.append({
+            "description": it.get("description") or "",
+            "qty": qty_val,
+            "unit": it.get("unit") or "UND",
+            "unit_price": price_val,
+            "hazmat": hz_val,
+            "certificado": cert_val,
+            "sin_iva": sin_iva_val,
+            "iva_pct": iva_val,
+            "remarks": it.get("remarks") or "",
+        })
+    d["items_json"] = json.dumps(items_serializados)
+
     if not items_validos:
         return render(request, "cotizador_form.html", {
             "user": user,
             "d": d,
             "max_items": MAX_ITEMS_COTIZADOR,
-            "fecha_hoy": str(date.today()),
+            "fecha_hoy": hoy,
+            "hoy": hoy,
+            "expira_default": expira_default,
+            "sugerencia_quote": d["quote_number"],
+            "clientes": clientes,
             "unidades_medida": UNIDADES_MEDIDA,
             "asesores_disponibles": asesores_disponibles,
             "error": "Debe registrar al menos un ítem con descripción o número de parte.",
@@ -5100,7 +5272,11 @@ async def cotizador_guardar(request: Request, user: models.Asesor = Depends(usua
                     "user": user,
                     "d": d,
                     "max_items": MAX_ITEMS_COTIZADOR,
-                    "fecha_hoy": str(date.today()),
+                    "fecha_hoy": hoy,
+                    "hoy": hoy,
+                    "expira_default": expira_default,
+                    "sugerencia_quote": d["quote_number"],
+                    "clientes": clientes,
                     "unidades_medida": UNIDADES_MEDIDA,
                     "asesores_disponibles": asesores_disponibles,
                     "error": f"Alta concurrencia operativa al guardar la cotización: {exc}. Por favor intente de nuevo.",
@@ -5113,103 +5289,35 @@ async def cotizador_guardar(request: Request, user: models.Asesor = Depends(usua
                 "user": user,
                 "d": d,
                 "max_items": MAX_ITEMS_COTIZADOR,
-                "fecha_hoy": str(date.today()),
+                "fecha_hoy": hoy,
+                "hoy": hoy,
+                "expira_default": expira_default,
+                "sugerencia_quote": d["quote_number"],
+                "clientes": clientes,
                 "unidades_medida": UNIDADES_MEDIDA,
                 "asesores_disponibles": asesores_disponibles,
                 "error": f"No fue posible guardar la cotización: {exc}",
             }, status=400)
 
     res_drive = generar_y_sincronizar_cotizacion(db, cot)
+
+    if accion_posterior == "descargar_excel" or request.url.path.endswith("/exportar_excel"):
+        if not cot.archivo_excel or not os.path.exists(cot.archivo_excel):
+            generar_y_sincronizar_cotizacion(db, cot)
+        if cot.archivo_excel and os.path.exists(cot.archivo_excel):
+            filename_download = f"Cotizacion_{nombre_seguro(cot.quote_number)}.xlsx"
+            return FileResponse(
+                cot.archivo_excel,
+                filename=filename_download,
+                media_type=XLSX_MIME
+            )
+
+    if accion_posterior == "convertir_po":
+        request.session["flash"] = {"ok": True, "msg": f"Cotización {cot.quote_number} guardada exitosamente. {res_drive}."}
+        return RedirectResponse(f"/pedidos/nuevo?cot_id={cot.id}", status_code=303)
+
     request.session["flash"] = {"ok": True, "msg": f"Cotización {cot.quote_number} guardada exitosamente. {res_drive}."}
     return RedirectResponse("/pedidos", status_code=303)
-
-
-@app.post("/cotizador/exportar_excel")
-async def cotizador_exportar_excel(request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
-    if user.rol == "Almacenista":
-        return RedirectResponse("/inventario?warehouse=1", status_code=303)
-    permitido, msg_horario = validar_horario_asesor(user)
-    if not permitido:
-        request.session["flash"] = {"ok": False, "msg": msg_horario}
-        return RedirectResponse("/pedidos", status_code=303)
-
-    f = await request.form()
-    d = _datos_cotizador_desde_form(f, user)
-    if not d["quote_number"]:
-        d["quote_number"] = sugerir_siguiente_cotizacion(db)
-
-    cotizacion_data = {
-        "quote_number": d["quote_number"],
-        "quote_date": d["quote_date"],
-        "expiration_date": d["expiration_date"],
-        "prepared_by": d["prepared_by"],
-        "to_company": d["to_company"],
-        "ref_no": d["ref_no"],
-        "phone": d["phone"],
-        "site": d["site"],
-        "contact": d["contact"],
-        "terms": d["terms"],
-        "email": d["email"],
-        "transport": float(str(d["transport"] or "0").replace(",", "") or 0.00),
-    }
-
-    items = []
-    for i, it in enumerate(d["items"]):
-        if (it.get("description") or "").strip():
-            pr_base = float(str(it.get("unit_price") or "0").replace(",", "") or 0.0)
-            hz = float(str(it.get("cobro_hazmat") or "0").replace(",", "") or 0.0)
-            ce = float(str(it.get("cobro_certificado") or "0").replace(",", "") or 0.0)
-            qty_f = float(str(it.get("qty") or "1").replace(",", "") or 1.0)
-            unit_price_efectivo = pr_base + ((hz + ce) / qty_f if qty_f > 0 else 0.0)
-            items.append({
-                "item": i + 1,
-                "description": it["description"].strip(),
-                "unit": it.get("unit") or "UND",
-                "qty": qty_f,
-                "unit_price": unit_price_efectivo,
-                "remarks": it.get("remarks") or ""
-            })
-
-    try:
-        if items:
-            _guardar_cotizacion_en_bd(db, user, d)
-            db.commit()
-    except Exception:
-        db.rollback()
-
-    plantilla_original = os.path.join(BASE_DIR, "FORMATO COTIZACION VERSION 4.xlsx")
-    if not os.path.exists(plantilla_original):
-        request.session["flash"] = {
-            "ok": False,
-            "msg": "Error Crítico: El archivo 'FORMATO COTIZACION VERSION 4.xlsx' no se encontró en la carpeta raíz del proyecto."
-        }
-        return RedirectResponse("/cotizador/nuevo", status_code=303)
-
-    nombre_seguro_po = nombre_seguro(cotizacion_data["quote_number"])
-    nombre_archivo_final = f"Cotizacion_{nombre_seguro_po}.xlsx"
-
-    carpeta_cotizaciones = os.path.join(BASE_DIR, "Cotizaciones", nombre_seguro(user.nombre))
-    os.makedirs(carpeta_cotizaciones, exist_ok=True)
-    ruta_archivo_final = os.path.join(carpeta_cotizaciones, nombre_archivo_final)
-
-    try:
-        _generar_cotizacion_desde_plantilla_xml(
-            plantilla_original,
-            ruta_archivo_final,
-            cotizacion_data,
-            items,
-            cotizacion_data["transport"],
-        )
-    except Exception as exc:
-        traceback.print_exc()
-        request.session["flash"] = {"ok": False, "msg": f"No se pudo generar la cotización: {exc}"}
-        return RedirectResponse("/cotizador/nuevo", status_code=303)
-
-    return FileResponse(
-        ruta_archivo_final,
-        filename=nombre_archivo_final,
-        media_type=XLSX_MIME
-    )
 
 
 @app.get("/cotizaciones", response_class=HTMLResponse)
@@ -5323,6 +5431,9 @@ def sincronizar_cotizacion_drive_manual(cid: int, request: Request, user: models
 
 
 @app.api_route("/drive/sincronizar_todo", methods=["GET", "POST"])
+@app.api_route("/drive/sincronizar", methods=["GET", "POST"])
+@app.api_route("/pedidos/sincronizar_drive_todo", methods=["GET", "POST"])
+@app.api_route("/pedidos/sincronizar_drive", methods=["GET", "POST"])
 def sincronizar_todo_drive_endpoint(request: Request, user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
     if user.rol == "Almacenista":
         return RedirectResponse("/inventario?warehouse=1", status_code=303)

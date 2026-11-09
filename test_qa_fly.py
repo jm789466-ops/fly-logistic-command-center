@@ -1219,6 +1219,112 @@ def verificar_reglas_negocio_y_arquitectura(db, admin, leonardo, miguel, carlos,
     resp_exp_asesor_maestro = main.descargar_excel_maestro_productos(asesor=str(asesor.id), user=asesor, db=db)
     assert resp_exp_asesor_maestro.status_code == 200, "Asesor debe poder descargar su propio Control Maestro de Productos"
 
+    # 22. Validación QA Rigurosa del Cotizador Formato V4 y Sincronización Google Drive
+    class DummyFormRequest:
+        def __init__(self, payload=None, path="/cotizador/generar"):
+            self.session = {}
+            self.headers = {}
+            self.method = "POST"
+            self.url = type("URLObj", (), {"path": path})()
+            self.scope = {"type": "http", "session": self.session}
+            self._payload = payload or {}
+
+        async def form(self):
+            class FormDataMock(dict):
+                def getlist(self, key):
+                    val = self.get(key)
+                    if val is None:
+                        return []
+                    if isinstance(val, list):
+                        return val
+                    return [val]
+            return FormDataMock(self._payload)
+
+    # 22a. Prueba: Guardar y Descargar Excel V4 (.xlsx) directamente en el navegador
+    req_cot_excel = DummyFormRequest({
+        "quote_number": "Q-QA-TEST-001",
+        "quote_date": "2026-11-09",
+        "expiration_date": "2026-11-24",
+        "to_company": "AeroRepublica QA",
+        "ref_no": "RFQ-QA-999",
+        "contact": "Ing. Pruebas QA",
+        "phone": "+57 311 000 0000",
+        "email": "qa@aerorepublica.com",
+        "site": "Bogota D.C.",
+        "terms": "Contado",
+        "incoterm": "EXW",
+        "delivery_time": "3 a 5 dias",
+        "moneda": "COP",
+        "tipo_operacion": "Nacional",
+        "part_number": ["EF-TEST-100", "EF-TEST-200"],
+        "unit": ["UND", "EA"],
+        "qty": ["2", "1"],
+        "unit_price": ["150000", "280000"],
+        "cobro_hazmat": ["0", "20000"],
+        "cobro_certificado": ["5000", "0"],
+        "sin_iva": ["0", "0"],
+        "iva_pct": ["19", "19"],
+        "remarks": ["Repuesto critico", "Certificado FAA 8130"],
+        "transport": "15000",
+        "accion_posterior": "descargar_excel",
+    }, path="/cotizador/generar")
+
+    resp_cot_excel = run_coro(main.cotizador_guardar(req_cot_excel, user=admin, db=db))
+    assert resp_cot_excel.status_code == 200, "Guardar y Descargar Excel V4 debe retornar HTTP 200"
+    assert "application/vnd.openxmlformats" in (resp_cot_excel.media_type or "").lower() or resp_cot_excel.media_type == main.XLSX_MIME
+    assert os.path.exists(resp_cot_excel.path), "El archivo Excel V4 generado debe existir físicamente en el disco"
+
+    # Verificar que la cotización se registró en base de datos
+    cot_guardada = db.query(models.Cotizacion).filter(models.Cotizacion.numero == "Q-QA-TEST-001").first()
+    assert cot_guardada is not None, "La cotización Q-QA-TEST-001 debe existir en base de datos"
+    assert len(cot_guardada.items) == 2, "La cotización debe tener sus 2 ítems registrados"
+    assert cot_guardada.archivo_excel and os.path.exists(cot_guardada.archivo_excel), "La ruta al Excel debe estar guardada en la cotización"
+
+    # 22b. Prueba: Descarga de Excel existente vía /cotizaciones/{cid}/excel
+    resp_get_excel = main.descargar_cotizacion_excel(cot_guardada.id, req_qa, user=admin, db=db)
+    assert resp_get_excel.status_code == 200, "Descarga directa /cotizaciones/{cid}/excel debe responder HTTP 200"
+    assert os.path.exists(resp_get_excel.path), "El archivo descargado debe existir"
+
+    # 22c. Prueba: Guardar y Convertir en Orden (PO)
+    req_cot_conv = DummyFormRequest({
+        "quote_number": "Q-QA-TEST-CONV",
+        "to_company": "Avianca QA",
+        "part_number": ["CONV-PART-1"],
+        "unit": ["UND"],
+        "qty": ["1"],
+        "unit_price": ["500000"],
+        "accion_posterior": "convertir_po",
+    }, path="/cotizador/generar")
+    resp_cot_conv = run_coro(main.cotizador_guardar(req_cot_conv, user=admin, db=db))
+    assert resp_cot_conv.status_code == 303, "Convertir PO debe redireccionar HTTP 303"
+    assert "/pedidos/nuevo?cot_id=" in resp_cot_conv.headers["location"]
+
+    # 22d. Prueba: Guardar y Volver al Panel
+    req_cot_panel = DummyFormRequest({
+        "quote_number": "Q-QA-TEST-PANEL",
+        "to_company": "LATAM QA",
+        "part_number": ["PANEL-PART-1"],
+        "unit": ["UND"],
+        "qty": ["1"],
+        "unit_price": ["320000"],
+        "accion_posterior": "guardar_ir_panel",
+    }, path="/cotizador/guardar")
+    resp_cot_panel = run_coro(main.cotizador_guardar(req_cot_panel, user=admin, db=db))
+    assert resp_cot_panel.status_code == 303, "Guardar y volver debe redireccionar HTTP 303"
+    assert resp_cot_panel.headers["location"] == "/pedidos"
+
+    # 22e. Prueba: Endpoint de sincronización masiva Google Drive
+    req_drive = DummyFormRequest(path="/drive/sincronizar_todo")
+    resp_drive = main.sincronizar_todo_drive_endpoint(req_drive, user=admin, db=db)
+    assert resp_drive.status_code == 303, "Sincronizar Drive debe redireccionar a /pedidos"
+    assert "flash" in req_drive.session, "Debe reportar el resultado de sincronización en flash session"
+
+    # 22f. Validación de consistencia en plantillas HTML
+    html_cot_form = open(os.path.join(BASE_DIR, "templates", "cotizador_form.html"), "r", encoding="utf-8").read()
+    assert 'action="/cotizador/generar"' in html_cot_form, "Formulario debe apuntar al endpoint /cotizador/generar"
+    assert 'name="accion_posterior"' in html_cot_form and 'value="descargar_excel"' in html_cot_form, "Botón descargar excel debe estar presente"
+    assert 'Sincronizar con Drive' in html_pedidos, "pedidos.html debe contar con el botón Sincronizar con Drive"
+
     print("OK - Todas las pruebas unitarias, financieras, horarias, concurrencia FOR UPDATE, tracking y arquitectura superadas al 100%.")
 
 
