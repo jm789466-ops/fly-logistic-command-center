@@ -1187,6 +1187,38 @@ def verificar_reglas_negocio_y_arquitectura(db, admin, leonardo, miguel, carlos,
     resp_exp_cot = main.exportar_cotizaciones_excel(user=admin, db=db)
     assert resp_exp_cot.status_code == 200, "El endpoint /cotizaciones/exportar/excel debe responder HTTP 200 con el archivo generado"
 
+    # 21. Validación Rigurosa de los 8 Reportes Excel Centralizados (HTTP 200 y Generación de Archivo)
+    resp_exp_1 = main.descargar_consolidado_individual(user=admin, db=db)
+    assert resp_exp_1.status_code == 200, "1. Consolidado de POs debe responder HTTP 200"
+
+    resp_exp_2 = main.descargar_excel_maestro_productos(user=admin, db=db)
+    assert resp_exp_2.status_code == 200, "2. Control Maestro de Productos por PO debe responder HTTP 200"
+
+    resp_exp_3 = main.descargar_informe_gerencial(user=admin, db=db)
+    assert resp_exp_3.status_code == 200, "3. Informe Ejecutivo de Gestión y SLA debe responder HTTP 200"
+
+    resp_exp_4 = main.exportar_cotizaciones_excel(user=admin, db=db)
+    assert resp_exp_4.status_code == 200, "4. Cartera de Cotizaciones debe responder HTTP 200"
+
+    resp_exp_5 = main.exportar_excel_inventario_maestro(user=admin, db=db)
+    assert resp_exp_5.status_code == 200, "5. Inventario Maestro Consolidado debe responder HTTP 200"
+
+    resp_exp_6 = main.exportar_excel_warehouse(1, user=admin, db=db)
+    assert resp_exp_6.status_code == 200, "6. Inventario Bodega 1 debe responder HTTP 200"
+
+    resp_exp_7 = main.exportar_excel_warehouse(2, user=admin, db=db)
+    assert resp_exp_7.status_code == 200, "7. Inventario Bodega 2 debe responder HTTP 200"
+
+    resp_exp_8 = main.exportar_excel_warehouse(3, user=admin, db=db)
+    assert resp_exp_8.status_code == 200, "8. Inventario Bodega 3 debe responder HTTP 200"
+
+    # Validación con rol Asesor Comercial (debe responder 200 filtrado a sus pedidos)
+    resp_exp_asesor_sla = main.descargar_informe_gerencial(asesor=str(asesor.id), user=asesor, db=db)
+    assert resp_exp_asesor_sla.status_code == 200, "Asesor debe poder descargar su propio Informe de Gestión y SLA"
+
+    resp_exp_asesor_maestro = main.descargar_excel_maestro_productos(asesor=str(asesor.id), user=asesor, db=db)
+    assert resp_exp_asesor_maestro.status_code == 200, "Asesor debe poder descargar su propio Control Maestro de Productos"
+
     print("OK - Todas las pruebas unitarias, financieras, horarias, concurrencia FOR UPDATE, tracking y arquitectura superadas al 100%.")
 
 

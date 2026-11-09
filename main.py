@@ -1743,14 +1743,20 @@ def pedido_del_usuario(db: Session, pid: int, user: models.Asesor, bloquear: boo
 
 
 @app.get("/pedidos/consolidado/excel")
-def descargar_consolidado_individual(asesor_id: str = "", user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
+def descargar_consolidado_individual(
+    asesor: str = "",
+    asesor_id: str = "",
+    user: models.Asesor = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     if user.rol == "Almacenista":
         return RedirectResponse("/inventario?warehouse=1", status_code=303)
     visibles = ids_asesores_visibles(db, user)
     objetivo_user = user
+    filtro_asesor = asesor or asesor_id
 
-    if user.rol in ROLES_SUPERIORES and asesor_id.isdigit():
-        cand = db.get(models.Asesor, int(asesor_id))
+    if user.rol in ROLES_SUPERIORES and filtro_asesor.isdigit():
+        cand = db.get(models.Asesor, int(filtro_asesor))
         if cand and (visibles is None or cand.id in visibles):
             objetivo_user = cand
 
@@ -1762,7 +1768,7 @@ def descargar_consolidado_individual(asesor_id: str = "", user: models.Asesor = 
         joinedload(models.Pedido.documentos)
     )
 
-    if asesor_id.lower() == "todos" and user.rol in ROLES_SUPERIORES:
+    if filtro_asesor.lower() == "todos" and user.rol in ROLES_SUPERIORES:
         if visibles is not None:
             q_ped = q_ped.filter(models.Pedido.asesor_id.in_(visibles))
         pedidos_usuario = q_ped.all()
@@ -3150,12 +3156,25 @@ def vista_informes(request: Request, asesor_id: str = "", tipo: str = "", desde:
 
 
 @app.get("/informes/excel")
-def descargar_informe_gerencial(asesor_id: str = "", tipo: str = "", desde: str = "", hasta: str = "",
-                                user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
-    if user.rol not in ROLES_SUPERIORES:
-        return RedirectResponse(ruta_inicio_rol(user), status_code=303)
+@app.get("/informes/exportar")
+@app.get("/informes/exportar/gestion_sla")
+def descargar_informe_gerencial(
+    asesor: str = "",
+    asesor_id: str = "",
+    tipo: str = "",
+    desde: str = "",
+    hasta: str = "",
+    user: models.Asesor = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
+    if user.rol == "Almacenista":
+        return RedirectResponse("/inventario?warehouse=1", status_code=303)
 
-    ctx = _construir_analitica(db, user, asesor_id, tipo, desde, hasta)
+    filtro_asesor = asesor or asesor_id
+    if filtro_asesor.lower() == "todos":
+        filtro_asesor = ""
+
+    ctx = _construir_analitica(db, user, filtro_asesor, tipo, desde, hasta)
     wb = Workbook()
 
     ws1 = wb.active
@@ -3238,10 +3257,22 @@ def descargar_informe_gerencial(asesor_id: str = "", tipo: str = "", desde: str 
 
 
 @app.get("/informes/productos_excel")
-def descargar_excel_maestro_productos(asesor_id: str = "", tipo: str = "", estado_producto: str = "",
-                                      user: models.Asesor = Depends(usuario_actual), db: Session = Depends(get_db)):
-    if user.rol not in ROLES_SUPERIORES:
-        return RedirectResponse(ruta_inicio_rol(user), status_code=303)
+@app.get("/informes/exportar/productos_po")
+@app.get("/informes/exportar/maestro_productos")
+def descargar_excel_maestro_productos(
+    asesor: str = "",
+    asesor_id: str = "",
+    tipo: str = "",
+    estado_producto: str = "",
+    user: models.Asesor = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
+    if user.rol == "Almacenista":
+        return RedirectResponse("/inventario?warehouse=1", status_code=303)
+
+    filtro_asesor = asesor or asesor_id
+    if filtro_asesor.lower() == "todos":
+        filtro_asesor = ""
 
     visibles = ids_asesores_visibles(db, user)
     q_ped = db.query(models.Pedido).options(
@@ -3253,14 +3284,14 @@ def descargar_excel_maestro_productos(asesor_id: str = "", tipo: str = "", estad
     )
     if visibles is not None:
         q_ped = q_ped.filter(models.Pedido.asesor_id.in_(visibles))
-    if asesor_id.isdigit():
-        q_ped = q_ped.filter(models.Pedido.asesor_id == int(asesor_id))
+    if filtro_asesor.isdigit():
+        q_ped = q_ped.filter(models.Pedido.asesor_id == int(filtro_asesor))
     if tipo in ("Nacional", "Internacional"):
         q_ped = q_ped.filter(models.Pedido.tipo == tipo)
     if estado_producto in ESTADOS_PRODUCTO:
         q_ped = q_ped.filter(models.Pedido.items.any(models.ItemPedido.estado_producto == estado_producto))
 
-    pedidos = q_ped.all()
+    pedidos = q_ped.order_by(models.Pedido.id.desc()).all()
     carpeta_rep = os.path.join(BASE_DIR, "Reportes_Gerenciales")
     os.makedirs(carpeta_rep, exist_ok=True)
     ruta_rep = os.path.join(carpeta_rep, "Control_Maestro_Productos_PO_FlyLogistic.xlsx")
